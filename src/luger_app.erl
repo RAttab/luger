@@ -11,5 +11,5 @@
 start(_Type, _Args) ->
     luger_sup:start_link().
 
-stop(State) ->
+stop(_State) ->
     ok.

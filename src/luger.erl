@@ -11,6 +11,9 @@
          debug/2, debug/3
         ]).
 
+-behaviour(supervisor_bridge).
+-export([init/1, terminate/2]).
+
 -define(BASE_PRIORITY, 1 * 8).
 
 
@@ -18,11 +21,11 @@
 %% public interface
 %%-----------------------------------------------------------------
 
--spec start_link(stderr) -> {ok, Pid} | {error, Error}.
+-spec start_link(stderr) -> {ok, pid()} | {error, any()}.
 start_link(stderr) ->
     supervisor_bridget:start_link(?MODULE, stderr).
 
--spec start_link(syslog_udp, string(), integer()) -> {ok, Pid} | {error, Error}.
+-spec start_link(syslog_udp, string(), integer()) -> {ok, pid()} | {error, any()}.
 start_link(syslog_udp, Host, Port) ->
     supervisor_bridget:start_link(?MODULE, {syslog_udp, Host, Port}).
 
@@ -97,9 +100,6 @@ debug(Channel, Format, Args) ->
 %% supervisor_bridge callbacks
 %%-----------------------------------------------------------------
 
--behaviour(supervisor_bridge).
--export([init/1, terminate/2]).
-
 -type socket() :: term().
 -record(state, {
           host                          :: string(),
@@ -115,7 +115,7 @@ init(stderr) ->
     true = ets:insert_new(luger, {config, #state{type = stderr,
                                                  host = hostname()
                                                 }}),
-    {ok, self(), undefined}.
+    {ok, self(), undefined};
 
 init({syslog_udp, Host, Port}) ->
     ok, Socket = prim_inet:open(udp, inet, dgram),
@@ -152,12 +152,12 @@ trunc(_, S) when is_list(S) ->
     S.
 
 log(Priority, Channel, Message) ->
-    [{config, S}] = State = ets:lookup(luger, config),
+    [{config, State}] = State = ets:lookup(luger, config),
     {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:universal_time(),
     Data = io_lib:format("<~B> ~4.10B-~2.10B-~2.10BT~2.10B:~2.10B:~2.10B ~s ~p ~s ~s",
                          [Priority, Year, Month, Day, Hour, Min, Sec,
                           trunc(255, State#state.host), self(), trunc(32, Channel), Message]),
-    logto(State#state.type, Data, State),
+    log_to(State#state.type, Data, State),
     ok.
 
 log_to(stderr, Data, _) ->

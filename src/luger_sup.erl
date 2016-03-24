@@ -1,11 +1,13 @@
 -module(luger_sup).
 
+-export([start_link/0]).
+
+-behaviour(supervisor).
+-export([init/1]).
 
 %%-----------------------------------------------------------------
 %% API
 %%-----------------------------------------------------------------
-
--export([start_link/0]).
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
@@ -14,9 +16,6 @@ start_link() ->
 %%-----------------------------------------------------------------
 %% supervisor callbacks
 %%-----------------------------------------------------------------
-
--behaviour(supervisor).
--export([init/1]).
 
 init([]) ->
     Args = case application:get_env(type) of
