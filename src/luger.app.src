@@ -1,0 +1,11 @@
+{application, luger,
+ [{description, "Erlang lightweigth syslog logger"},
+  {vsn, "1.0.0"},
+  {modules, []},
+  {registered, [luger_sup]},
+  {applications, [kernel, stdlib]},
+  {mod, {luger_app, []}},
+  {env, [{type, syslog_udp}
+         {syslog_udp_host, "localhost"},
+         {syslog_udp_port, 514}]}
+ ]}.
