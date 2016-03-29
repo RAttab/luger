@@ -165,7 +165,7 @@ log_to(stderr, Data, _) ->
 log_to(syslog_udp, Data, State = #state{syslog_udp_socket = Socket,
                                         syslog_udp_host = Host,
                                         syslog_udp_port = Port}) ->
-    case inet_udp:send(Socket, Host, Port, iolist_to_binary(Data)) of
+    case inet_udp:send(Socket, Host, Port, Data) of
         ok -> ok;
         {error, Reason} ->
             io:format("ERROR: unable to log to syslog over udp with ~p: ~s~n",
