@@ -158,7 +158,7 @@ log(Priority, Channel, Message) ->
                           [Priority, Year, Month, Day, Hour, Min, Sec]),
             trunc(255, State#state.host), $\s,
             io_lib:format("~p ", [self()]),
-            Channel, $\s,
+            trunc(32, Channel), $\s,
             Message],
     log_to(State#state.type, Data, State),
     ok.

@@ -20,6 +20,10 @@ stderr_test_() ->
                luger:warning("chan.warn", "format: ~p", [blah]),
                luger:info("chan.info", "msg"),
                luger:info("chan.debug", "msg")
+       end},
+      {"trunc",
+       fun () ->
+               luger:alert("aasdfasdasdasdasdasdasdasdasdasdasdasdasdasdasdasd", "msg")
        end}
      ]}.
 
@@ -43,5 +47,9 @@ syslog_test_() ->
                luger:warning("chan.warn", "format: ~p", [blah]),
                luger:info("chan.info", "msg"),
                luger:info("chan.debug", "msg")
+       end},
+      {"trunc",
+       fun () ->
+               luger:alert("aasdfasdasdasdasdasdasdasdasdasdasdasdasdasdasdasd", "msg")
        end}
      ]}.
