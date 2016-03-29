@@ -118,7 +118,7 @@ init(stderr) ->
     {ok, self(), undefined};
 
 init({syslog_udp, Host, Port}) ->
-    ok, Socket = prim_inet:open(udp, inet, dgram),
+    {ok, Socket} = inet_udp:open(0),
     ets:new(luger, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
     true = ets:insert_new(luger, {config, #state{type = syslog_udp,
                                                  host = hostname(),
@@ -163,9 +163,9 @@ log(Priority, Channel, Message) ->
 log_to(stderr, Data, _) ->
     io:put_chars(standard_error, Data ++ "\n");
 log_to(syslog_udp, Data, State = #state{syslog_udp_socket = Socket,
-                                       syslog_udp_host = Host,
-                                       syslog_udp_port = Port}) ->
-    case prim_inet:sendto(Socket, Host, Port, Data) of
+                                        syslog_udp_host = Host,
+                                        syslog_udp_port = Port}) ->
+    case inet_udp:send(Socket, Host, Port, iolist_to_binary(Data)) of
         ok -> ok;
         {error, Reason} ->
             io:format("ERROR: unable to log to syslog over udp with ~p: ~s~n",
