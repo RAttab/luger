@@ -23,11 +23,11 @@
 
 -spec start_link(stderr) -> {ok, pid()} | {error, any()}.
 start_link(stderr) ->
-    supervisor_bridget:start_link(?MODULE, stderr).
+    supervisor_bridge:start_link(?MODULE, stderr).
 
 -spec start_link(syslog_udp, string(), integer()) -> {ok, pid()} | {error, any()}.
 start_link(syslog_udp, Host, Port) ->
-    supervisor_bridget:start_link(?MODULE, {syslog_udp, Host, Port}).
+    supervisor_bridge:start_link(?MODULE, {syslog_udp, Host, Port}).
 
 
 -spec emergency(string(), string()) -> ok.
@@ -152,9 +152,9 @@ trunc(_, S) when is_list(S) ->
     S.
 
 log(Priority, Channel, Message) ->
-    [{config, State}] = State = ets:lookup(luger, config),
+    [{config, State}] = ets:lookup(luger, config),
     {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:universal_time(),
-    Data = io_lib:format("<~B> ~4.10B-~2.10B-~2.10BT~2.10B:~2.10B:~2.10B ~s ~p ~s ~s",
+    Data = io_lib:format("<~B> ~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ~s ~p ~s ~s",
                          [Priority, Year, Month, Day, Hour, Min, Sec,
                           trunc(255, State#state.host), self(), trunc(32, Channel), Message]),
     log_to(State#state.type, Data, State),

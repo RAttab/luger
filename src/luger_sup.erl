@@ -20,14 +20,14 @@ start_link() ->
 init([]) ->
     Args = case application:get_env(type) of
                undefined ->
-                   stderr;
-               {ok, syslog_stderr} ->
-                   stderr;
+                   [stderr];
+               {ok, stderr} ->
+                   [stderr];
                {ok, syslog_udp} ->
                    {ok, Host} = application:get_env(syslog_udp_host),
                    {ok, Port} = application:get_env(syslog_udp_port),
-                   {syslog_udp, Host, Port}
+                   [syslog_udp, Host, Port]
            end,
 
     Children = [{luger, {luger, start_link, Args}, permanent, 1000, worker, [luger]}],
-    {ok, {one_for_one, 0, 1}, Children}.
+    {ok, {{one_for_one, 0, 1}, Children}}.
