@@ -37,7 +37,7 @@ Config for the application env can be one of the following:
 ```erlang
   {luger, [
       {type, syslog_udp},
-	  {syslog_udp_host, "127.0.0.1"},
+	  {syslog_udp_host, {127, 0, 0, 1}},
 	  {syslog_udp_port, 514}
   ]}
 ```
