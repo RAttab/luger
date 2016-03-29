@@ -154,14 +154,17 @@ trunc(_, S) when is_list(S) ->
 log(Priority, Channel, Message) ->
     [{config, State}] = ets:lookup(luger, config),
     {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:universal_time(),
-    Data = io_lib:format("<~B> ~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ~s ~p ~s ~s",
-                         [Priority, Year, Month, Day, Hour, Min, Sec,
-                          trunc(255, State#state.host), self(), trunc(32, Channel), Message]),
+    Data = [io_lib:format("<~B> ~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ",
+                          [Priority, Year, Month, Day, Hour, Min, Sec]),
+            trunc(255, State#state.host), $\s,
+            io_lib:format("~p ", [self()]),
+            Channel, $\s,
+            Message],
     log_to(State#state.type, Data, State),
     ok.
 
 log_to(stderr, Data, _) ->
-    io:put_chars(standard_error, Data ++ "\n");
+    io:put_chars(standard_error, [Data, $\n]);
 log_to(syslog_udp, Data, State = #state{syslog_udp_socket = Socket,
                                         syslog_udp_host = Host,
                                         syslog_udp_port = Port}) ->
