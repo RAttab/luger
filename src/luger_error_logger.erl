@@ -55,9 +55,4 @@ handle_info(_Event, S) ->
 %%-----------------------------------------------------------------
 
 report(Fn, Data) ->
-    %% I know I'm going to hell for having written this but I really
-    %% want strings to be displayed as strings (ie. can't use ~w)
-    %% without having to enable support for multi-line messages
-    %% (ie. can't use raw ~p) in syslog.
-    Tokens = string:tokens(lists:flatten(io_lib:format("~p", [Data])), [$\n]),
-    luger:Fn("sasl", lists:map(fun (Arg) -> string:strip(Arg) end, Tokens)).
+    luger:Fn("sasl", io_lib:format("~p", [Data])).
