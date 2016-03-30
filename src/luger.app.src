@@ -5,5 +5,7 @@
   {registered, [luger_sup]},
   {applications, [kernel, stdlib]},
   {mod, {luger_app, []}},
-  {env, [{type, stderr}]}
+  {env, [{app_name, "luger"},
+         {type, stderr}
+        ]}
  ]}.
