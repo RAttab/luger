@@ -1,6 +1,6 @@
 -module(luger).
 
--export([start_link/1, start_link/3,
+-export([start_link/2, start_link/4,
          emergency/2, emergency/3,
          alert/2, alert/3,
          critical/2, critical/3,
@@ -21,13 +21,13 @@
 %% public interface
 %%-----------------------------------------------------------------
 
--spec start_link(stderr) -> {ok, pid()} | {error, any()}.
-start_link(stderr) ->
-    supervisor_bridge:start_link(?MODULE, stderr).
+-spec start_link(string(), stderr) -> {ok, pid()} | {error, any()}.
+start_link(AppName, stderr) ->
+    supervisor_bridge:start_link(?MODULE, {AppName, stderr}).
 
--spec start_link(syslog_udp, string(), integer()) -> {ok, pid()} | {error, any()}.
-start_link(syslog_udp, Host, Port) ->
-    supervisor_bridge:start_link(?MODULE, {syslog_udp, Host, Port}).
+-spec start_link(string(), syslog_udp, string(), integer()) -> {ok, pid()} | {error, any()}.
+start_link(AppName, syslog_udp, Host, Port) ->
+    supervisor_bridge:start_link(?MODULE, {AppName, syslog_udp, Host, Port}).
 
 
 -spec emergency(string(), string()) -> ok.
@@ -102,6 +102,7 @@ debug(Channel, Format, Args) ->
 
 -type socket() :: term().
 -record(state, {
+          app                           :: string(),
           host                          :: string(),
           type                          :: stderr | syslog_udp,
           syslog_udp_socket = undefined :: undefined | socket(),
@@ -110,17 +111,19 @@ debug(Channel, Format, Args) ->
          }).
 
 
-init(stderr) ->
+init({AppName, stderr}) ->
     ets:new(luger, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
     true = ets:insert_new(luger, {config, #state{type = stderr,
+                                                 app = appname(AppName),
                                                  host = hostname()
                                                 }}),
     {ok, self(), undefined};
 
-init({syslog_udp, Host, Port}) ->
+init({AppName, syslog_udp, Host, Port}) ->
     {ok, Socket} = inet_udp:open(0),
     ets:new(luger, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
     true = ets:insert_new(luger, {config, #state{type = syslog_udp,
+                                                 app = appname(AppName),
                                                  host = hostname(),
                                                  syslog_udp_socket = Socket,
                                                  syslog_udp_host = Host,
@@ -136,27 +139,28 @@ terminate(_Reason, _State) ->
 %% implementation
 %%-----------------------------------------------------------------
 
-hostname() ->
-    {ok, Host} = inet:gethostname(),
-    Host.
-
 trunc(N, S) when is_binary(S) ->
     case S of
-        <<Sub:N/bytes, _>> -> Sub;
+        <<Sub:N/bytes, _/binary>> -> Sub;
         _ -> S
     end;
-trunc(N, S) when is_list(S), length(S) > N ->
-    {Head, _} = lists:split(N, S),
-    Head;
-trunc(_, S) when is_list(S) ->
-    S.
+trunc(N, S) when is_list(S) ->
+    trunc(N, iolist_to_binary(S)).
+
+appname(Name) ->
+    trunc(48, Name).
+
+hostname() ->
+    {ok, Host} = inet:gethostname(),
+    trunc(255, Host).
 
 log(Priority, Channel, Message) ->
     [{config, State}] = ets:lookup(luger, config),
     {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:universal_time(),
     Data = [io_lib:format("<~B> ~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ",
                           [Priority, Year, Month, Day, Hour, Min, Sec]),
-            trunc(255, State#state.host), $\s,
+            State#state.app, $\s,
+            State#state.host, $\s,
             io_lib:format("~p ", [self()]),
             trunc(32, Channel), $\s,
             Message],

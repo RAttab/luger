@@ -6,6 +6,7 @@ stderr_test_() ->
     {foreach,
      fun() ->
              application:load(luger),
+             application:set_env(luger, app_name, "luger_test"),
              application:set_env(luger, type, stderr),
              application:start(luger)
      end,
@@ -23,7 +24,8 @@ stderr_test_() ->
        end},
       {"trunc",
        fun () ->
-               luger:alert("aasdfasdasdasdasdasdasdasdasdasdasdasdasdasdasdasd", "msg")
+               luger:alert("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbb", "msg"),
+               luger:alert(<<"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbb">>, "msg")
        end}
      ]}.
 
@@ -31,6 +33,7 @@ syslog_test_() ->
     {foreach,
      fun() ->
              application:load(luger),
+             application:set_env(luger, app_name, "luger_test"),
              application:set_env(luger, type, syslog_udp),
              application:set_env(luger, syslog_udp_host, {127, 0, 0, 1}),
              application:set_env(luger, syslog_udp_port, 514),
@@ -50,6 +53,7 @@ syslog_test_() ->
        end},
       {"trunc",
        fun () ->
-               luger:alert("aasdfasdasdasdasdasdasdasdasdasdasdasdasdasdasdasd", "msg")
+               luger:alert("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbb", "msg"),
+               luger:alert(<<"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbb">>, "msg")
        end}
      ]}.
