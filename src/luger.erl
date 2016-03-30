@@ -1,6 +1,7 @@
 -module(luger).
+-include("luger.hrl").
 
--export([start_link/2, start_link/4,
+-export([start_link/3, start_link/4,
          emergency/2, emergency/3,
          alert/2, alert/3,
          critical/2, critical/3,
@@ -15,15 +16,16 @@
 -export([init/1, terminate/2]).
 
 -define(BASE_PRIORITY, 1 * 8).
+-define(DEFAULT_PRIORITY, ?BASE_PRIORITY + 4).
 
 
 %%-----------------------------------------------------------------
 %% public interface
 %%-----------------------------------------------------------------
 
--spec start_link(string(), stderr) -> {ok, pid()} | {error, any()}.
-start_link(AppName, stderr) ->
-    supervisor_bridge:start_link(?MODULE, {AppName, stderr}).
+-spec start_link(string(), stderr, integer()) -> {ok, pid()} | {error, any()}.
+start_link(AppName, stderr, MinPriority) ->
+    supervisor_bridge:start_link(?MODULE, {AppName, stderr, MinPriority}).
 
 -spec start_link(string(), syslog_udp, string(), integer()) -> {ok, pid()} | {error, any()}.
 start_link(AppName, syslog_udp, Host, Port) ->
@@ -32,7 +34,7 @@ start_link(AppName, syslog_udp, Host, Port) ->
 
 -spec emergency(string(), string()) -> ok.
 emergency(Channel, Message) ->
-    log(?BASE_PRIORITY + 0, Channel, Message).
+    log(?EMERGENCY, Channel, Message).
 
 -spec emergency(string(), string(), [any()]) -> ok.
 emergency(Channel, Format, Args) ->
@@ -40,7 +42,7 @@ emergency(Channel, Format, Args) ->
 
 -spec alert(string(), string()) -> ok.
 alert(Channel, Message) ->
-    log(?BASE_PRIORITY + 1, Channel, Message).
+    log(?ALERT, Channel, Message).
 
 -spec alert(string(), string(), [any()]) -> ok.
 alert(Channel, Format, Args) ->
@@ -48,7 +50,7 @@ alert(Channel, Format, Args) ->
 
 -spec critical(string(), string()) -> ok.
 critical(Channel, Message) ->
-    log(?BASE_PRIORITY + 2, Channel, Message).
+    log(?CRITICAL, Channel, Message).
 
 -spec critical(string(), string(), [any()]) -> ok.
 critical(Channel, Format, Args) ->
@@ -56,7 +58,7 @@ critical(Channel, Format, Args) ->
 
 -spec error(string(), string()) -> ok.
 error(Channel, Message) ->
-    log(?BASE_PRIORITY + 3, Channel, Message).
+    log(?ERROR, Channel, Message).
 
 -spec error(string(), string(), [any()]) -> ok.
 error(Channel, Format, Args) ->
@@ -64,7 +66,7 @@ error(Channel, Format, Args) ->
 
 -spec warning(string(), string()) -> ok.
 warning(Channel, Message) ->
-    log(?BASE_PRIORITY + 4, Channel, Message).
+    log(?WARNING, Channel, Message).
 
 -spec warning(string(), string(), [any()]) -> ok.
 warning(Channel, Format, Args) ->
@@ -72,7 +74,7 @@ warning(Channel, Format, Args) ->
 
 -spec notice(string(), string()) -> ok.
 notice(Channel, Message) ->
-    log(?BASE_PRIORITY + 5, Channel, Message).
+    log(?NOTICE, Channel, Message).
 
 -spec notice(string(), string(), [any()]) -> ok.
 notice(Channel, Format, Args) ->
@@ -80,7 +82,7 @@ notice(Channel, Format, Args) ->
 
 -spec info(string(), string()) -> ok.
 info(Channel, Message) ->
-    log(?BASE_PRIORITY + 6, Channel, Message).
+    log(?INFO, Channel, Message).
 
 -spec info(string(), string(), [any()]) -> ok.
 info(Channel, Format, Args) ->
@@ -88,7 +90,7 @@ info(Channel, Format, Args) ->
 
 -spec debug(string(), string()) -> ok.
 debug(Channel, Message) ->
-    log(?BASE_PRIORITY + 7, Channel, Message).
+    log(?DEBUG, Channel, Message).
 
 -spec debug(string(), string(), [any()]) -> ok.
 debug(Channel, Format, Args) ->
@@ -102,20 +104,22 @@ debug(Channel, Format, Args) ->
 
 -type socket() :: term().
 -record(state, {
-          app                           :: string(),
-          host                          :: string(),
-          type                          :: stderr | syslog_udp,
-          syslog_udp_socket = undefined :: undefined | socket(),
-          syslog_udp_host   = undefined :: undefined | string(),
-          syslog_udp_port   = undefined :: undefined | integer()
+          app                             :: string(),
+          host                            :: string(),
+          type                            :: stderr | syslog_udp,
+          syslog_udp_socket = undefined   :: undefined | socket(),
+          syslog_udp_host   = undefined   :: undefined | string(),
+          syslog_udp_port   = undefined   :: undefined | integer(),
+          stderr_min_priority = undefined :: undefined | integer()
          }).
 
 
-init({AppName, stderr}) ->
+init({AppName, stderr, MinPriority}) ->
     ets:new(luger, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
     true = ets:insert_new(luger, {config, #state{type = stderr,
                                                  app = appname(AppName),
-                                                 host = hostname()
+                                                 host = hostname(),
+                                                 stderr_min_priority = MinPriority
                                                 }}),
     ok = error_logger:add_report_handler(luger_error_logger),
     {ok, self(), undefined};
@@ -167,12 +171,14 @@ log(Priority, Channel, Message) ->
             io_lib:format("~p ", [self()]),
             trunc(32, Channel), $\s,
             Message],
-    log_to(State#state.type, Data, State),
+    log_to(Priority, State#state.type, Data, State),
     ok.
 
-log_to(stderr, Data, _) ->
+log_to(Priority, stderr, Data, #state{stderr_min_priority = MinPriority}) when Priority =< MinPriority ->
     io:put_chars(standard_error, [Data, $\n]);
-log_to(syslog_udp, Data, State = #state{syslog_udp_socket = Socket,
+log_to(_Priority, stderr, _Data, _State) ->
+    ok;
+log_to(Priority, syslog_udp, Data, State = #state{syslog_udp_socket = Socket,
                                         syslog_udp_host = Host,
                                         syslog_udp_port = Port}) ->
     case inet_udp:send(Socket, Host, Port, Data) of
@@ -180,5 +186,5 @@ log_to(syslog_udp, Data, State = #state{syslog_udp_socket = Socket,
         {error, Reason} ->
             io:format("ERROR: unable to log to syslog over udp with ~p: ~s~n",
                       [{Socket, Host, Port}, Reason]),
-            log_to(stderr, Data, State)
+            log_to(Priority, stderr, Data, State)
     end.
