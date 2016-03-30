@@ -117,6 +117,7 @@ init({AppName, stderr}) ->
                                                  app = appname(AppName),
                                                  host = hostname()
                                                 }}),
+    ok = error_logger:add_report_handler(luger_error_logger),
     {ok, self(), undefined};
 
 init({AppName, syslog_udp, Host, Port}) ->
@@ -129,9 +130,11 @@ init({AppName, syslog_udp, Host, Port}) ->
                                                  syslog_udp_host = Host,
                                                  syslog_udp_port = Port
                                                 }}),
+    ok = error_logger:add_report_handler(luger_error_logger),
     {ok, self(), undefined}.
 
 terminate(_Reason, _State) ->
+    error_logger:delete_report_handler(luger_error_logger),
     ok.
 
 

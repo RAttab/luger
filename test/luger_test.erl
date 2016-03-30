@@ -57,3 +57,22 @@ syslog_test_() ->
                luger:alert(<<"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbb">>, "msg")
        end}
      ]}.
+
+error_logger_test_() ->
+    {foreach,
+     fun() ->
+             application:load(luger),
+             application:set_env(luger, app_name, "luger_test"),
+             application:set_env(luger, type, stderr),
+             application:start(luger)
+     end,
+     fun(_) ->
+             application:stop(luger)
+     end,
+     [
+      {"basic error logger",
+       fun () ->
+               error_logger:error_msg("error_msg"),
+               error_logger:error_report("error_report")
+       end}
+     ]}.
