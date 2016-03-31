@@ -94,7 +94,6 @@ debug(Channel, Format, Args) ->
     debug(Channel, io_lib:format(Format, Args)).
 
 
-
 %%-----------------------------------------------------------------
 %% supervisor_bridge callbacks
 %%-----------------------------------------------------------------
@@ -105,10 +104,10 @@ debug(Channel, Format, Args) ->
           host                            :: string(),
           statsd                          :: boolean(),
           type                            :: stderr | syslog_udp,
+          stderr_min_priority = ?WARNING  :: integer(),
           syslog_udp_socket = undefined   :: undefined | socket(),
           syslog_udp_host   = undefined   :: undefined | string(),
-          syslog_udp_port   = undefined   :: undefined | integer(),
-          stderr_min_priority = undefined :: undefined | integer()
+          syslog_udp_port   = undefined   :: undefined | integer()
          }).
 
 init([#config{app = AppName, host = HostName, statsd = Statsd}, SinkConfig]) ->
@@ -167,9 +166,10 @@ log_to(Priority, stderr, Data, #state{stderr_min_priority = MinPriority}) when P
     io:put_chars(standard_error, [Data, $\n]);
 log_to(_Priority, stderr, _Data, _State) ->
     ok;
+
 log_to(Priority, syslog_udp, Data, State = #state{syslog_udp_socket = Socket,
-                                        syslog_udp_host = Host,
-                                        syslog_udp_port = Port}) ->
+                                                  syslog_udp_host = Host,
+                                                  syslog_udp_port = Port}) ->
     case inet_udp:send(Socket, Host, Port, Data) of
         ok -> ok;
         {error, Reason} ->
