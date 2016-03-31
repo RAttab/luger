@@ -32,55 +32,55 @@ start_link(AppName, syslog_udp, Host, Port) ->
     supervisor_bridge:start_link(?MODULE, {AppName, syslog_udp, Host, Port}).
 
 
--spec emergency(string(), string()) -> ok.
+-spec emergency(string(), string()) -> ok | {error, luger_not_running}.
 emergency(Channel, Message) ->
     log(?EMERGENCY, Channel, Message).
 
--spec emergency(string(), string(), [any()]) -> ok.
+-spec emergency(string(), string(), [any()]) -> ok | {error, luger_not_running}.
 emergency(Channel, Format, Args) ->
     emergency(Channel, io_lib:format(Format, Args)).
 
--spec alert(string(), string()) -> ok.
+-spec alert(string(), string()) -> ok | {error, luger_not_running}.
 alert(Channel, Message) ->
     log(?ALERT, Channel, Message).
 
--spec alert(string(), string(), [any()]) -> ok.
+-spec alert(string(), string(), [any()]) -> ok | {error, luger_not_running}.
 alert(Channel, Format, Args) ->
     alert(Channel, io_lib:format(Format, Args)).
 
--spec critical(string(), string()) -> ok.
+-spec critical(string(), string()) -> ok | {error, luger_not_running}.
 critical(Channel, Message) ->
     log(?CRITICAL, Channel, Message).
 
--spec critical(string(), string(), [any()]) -> ok.
+-spec critical(string(), string(), [any()]) -> ok | {error, luger_not_running}.
 critical(Channel, Format, Args) ->
     critical(Channel, io_lib:format(Format, Args)).
 
--spec error(string(), string()) -> ok.
+-spec error(string(), string()) -> ok | {error, luger_not_running}.
 error(Channel, Message) ->
     log(?ERROR, Channel, Message).
 
--spec error(string(), string(), [any()]) -> ok.
+-spec error(string(), string(), [any()]) -> ok | {error, luger_not_running}.
 error(Channel, Format, Args) ->
     luger:error(Channel, io_lib:format(Format, Args)).
 
--spec warning(string(), string()) -> ok.
+-spec warning(string(), string()) -> ok | {error, luger_not_running}.
 warning(Channel, Message) ->
     log(?WARNING, Channel, Message).
 
--spec warning(string(), string(), [any()]) -> ok.
+-spec warning(string(), string(), [any()]) -> ok | {error, luger_not_running}.
 warning(Channel, Format, Args) ->
     warning(Channel, io_lib:format(Format, Args)).
 
--spec notice(string(), string()) -> ok.
+-spec notice(string(), string()) -> ok | {error, luger_not_running}.
 notice(Channel, Message) ->
     log(?NOTICE, Channel, Message).
 
--spec notice(string(), string(), [any()]) -> ok.
+-spec notice(string(), string(), [any()]) -> ok | {error, luger_not_running}.
 notice(Channel, Format, Args) ->
     notice(Channel, io_lib:format(Format, Args)).
 
--spec info(string(), string()) -> ok.
+-spec info(string(), string()) -> ok | {error, luger_not_running}.
 info(Channel, Message) ->
     log(?INFO, Channel, Message).
 
@@ -162,7 +162,14 @@ hostname() ->
     trunc(255, Host).
 
 log(Priority, Channel, Message) ->
-    [{config, State}] = ets:lookup(luger, config),
+    case ets:lookup(luger, config) of
+        [{config, State}] ->
+            log(Priority, Channel, Message, State);
+        _ ->
+            {error, luger_not_running}
+    end.
+
+log(Priority, Channel, Message, State) ->
     {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:universal_time(),
     Data = [io_lib:format("<~B> ~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ",
                           [Priority, Year, Month, Day, Hour, Min, Sec]),
