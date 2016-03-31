@@ -18,6 +18,17 @@ start_link() ->
 %% supervisor callbacks
 %%-----------------------------------------------------------------
 
+args() ->
+    {ok, AppName} = application:get_env(app_name),
+    HostName = luger_utils:hostname(),
+    Statsd = case application:get_env(statsd) of
+                 {ok, Value} -> Value;
+                 _ -> false
+             end,
+    #config{app = luger_utils:appname(AppName),
+            host = HostName,
+            statsd = Statsd }.
+
 stderr_args() ->
     MinPriority = case application:get_env(stderr_min_priority) of
                       undefined -> ?WARNING;
@@ -30,22 +41,20 @@ stderr_args() ->
                       {ok, info} -> ?INFO;
                       {ok, debug} -> ?DEBUG
                       end,
-    [stderr, MinPriority].
+    #stderr_config{min_priority = MinPriority}.
 
 syslog_udp_args() ->
     {ok, Host} = application:get_env(syslog_udp_host),
     {ok, Port} = application:get_env(syslog_udp_port),
-    [syslog_udp, Host, Port].
+    #syslog_udp_config{host = Host, port = Port}.
 
 init([]) ->
-    Args = case application:get_env(type) of
+    Args = args(),
+    SinkArgs = case application:get_env(type) of
                undefined -> stderr_args();
                {ok, stderr} -> stderr_args();
                {ok, syslog_udp} -> syslog_udp_args()
            end,
 
-    {ok, AppName} = application:get_env(app_name),
-    Args0 = [AppName] ++ Args,
-
-    Children = [{luger, {luger, start_link, Args0}, permanent, 1000, worker, [luger]}],
+    Children = [{luger, {luger, start_link, [Args, SinkArgs]}, permanent, 1000, worker, [luger]}],
     {ok, {{one_for_one, 0, 1}, Children}}.

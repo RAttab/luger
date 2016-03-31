@@ -1,6 +1,6 @@
 {application, luger,
  [{description, "Erlang direct-to-syslog UDP logger"},
-  {vsn, "1.0.0"},
+  {vsn, "1.0.3"},
   {modules, []},
   {registered, [luger_sup]},
   {applications, [kernel, stdlib]},

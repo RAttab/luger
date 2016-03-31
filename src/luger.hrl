@@ -8,3 +8,13 @@
 -define(NOTICE, ?SYSLOG_BASE_PRIORITY + 5).
 -define(INFO, ?SYSLOG_BASE_PRIORITY + 6).
 -define(DEBUG, ?SYSLOG_BASE_PRIORITY + 7).
+
+-record(config, { app    :: string(),
+                  host   :: string(),
+                  statsd :: boolean()
+                }).
+
+-record(syslog_udp_config, { host :: string(),
+                             port :: integer() }).
+
+-record(stderr_config, { min_priority :: integer() }).
