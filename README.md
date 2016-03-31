@@ -44,6 +44,9 @@ Config for the application env can be one of the following:
   ]}
 ```
 
+It's also possible to record the number of messages received per priority into
+statsd through statsderl by adding `{statsd, true}` to the config.
+
 Once the application is set up, logging can be done like so:
 ```erlang
 luger:error("channel", "message: ~B", [10]),
