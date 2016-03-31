@@ -2,6 +2,10 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+no_start_test() ->
+    luger:alert("chan.alert", "format: ~s", ["blah"]).
+
+
 stderr_test_() ->
     {foreach,
      fun() ->

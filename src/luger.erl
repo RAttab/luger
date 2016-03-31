@@ -17,6 +17,7 @@
 
 -define(BASE_PRIORITY, 1 * 8).
 -define(DEFAULT_PRIORITY, ?BASE_PRIORITY + 4).
+-define(LUGER_NAME, luger).
 
 
 %%-----------------------------------------------------------------
@@ -113,6 +114,10 @@ debug(Channel, Format, Args) ->
           stderr_min_priority = undefined :: undefined | integer()
          }).
 
+init() ->
+    register(?LUGER_NAME, self()),
+    ok = error_logger:add_report_handler(luger_error_logger),
+    {ok, self(), undefined}.
 
 init({AppName, stderr, MinPriority}) ->
     ets:new(luger, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
@@ -121,9 +126,7 @@ init({AppName, stderr, MinPriority}) ->
                                                  host = hostname(),
                                                  stderr_min_priority = MinPriority
                                                 }}),
-    ok = error_logger:add_report_handler(luger_error_logger),
-    {ok, self(), undefined};
-
+    init();
 init({AppName, syslog_udp, Host, Port}) ->
     {ok, Socket} = inet_udp:open(0),
     ets:new(luger, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
@@ -134,8 +137,7 @@ init({AppName, syslog_udp, Host, Port}) ->
                                                  syslog_udp_host = Host,
                                                  syslog_udp_port = Port
                                                 }}),
-    ok = error_logger:add_report_handler(luger_error_logger),
-    {ok, self(), undefined}.
+    init().
 
 terminate(_Reason, _State) ->
     error_logger:delete_report_handler(luger_error_logger),
@@ -162,14 +164,14 @@ hostname() ->
     trunc(255, Host).
 
 log(Priority, Channel, Message) ->
-    case ets:lookup(luger, config) of
-        [{config, State}] ->
-            log(Priority, Channel, Message, State);
-        _ ->
-            {error, luger_not_running}
+    case whereis(?LUGER_NAME) of
+        undefined -> {error, luger_not_running};
+        _ -> do_log(Priority, Channel, Message)
     end.
 
-log(Priority, Channel, Message, State) ->
+do_log(Priority, Channel, Message) ->
+    [{config, State}] = ets:lookup(luger, config),
+
     {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:universal_time(),
     Data = [io_lib:format("<~B> ~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ",
                           [Priority, Year, Month, Day, Hour, Min, Sec]),
