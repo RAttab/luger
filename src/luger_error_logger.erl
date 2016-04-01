@@ -23,22 +23,22 @@ terminate(_Args, _State) ->
     ok.
 
 handle_event({error, _, Data}, S) ->
-    report(error, Data),
+    log_msg(error, Data),
     {ok, S};
 handle_event({error_report, _, Data}, S) ->
-    report(error, Data),
+    log_report(error, Data),
     {ok, S};
 handle_event({warning_msg, _, Data}, S) ->
-    report(warning, Data),
+    log_msg(warning, Data),
     {ok, S};
 handle_event({warning_report, _, Data}, S) ->
-    report(warning, Data),
+    log_report(warning, Data),
     {ok, S};
 handle_event({info_msg, _, Data}, S) ->
-    report(info, Data),
+    log_msg(info, Data),
     {ok, S};
 handle_event({info_report, _, Data}, S) ->
-    report(info, Data),
+    log_report(info, Data),
     {ok, S};
 handle_event(_Event, S) ->
     {ok, S}.
@@ -54,5 +54,8 @@ handle_info(_Event, S) ->
 %% impl
 %%-----------------------------------------------------------------
 
-report(Fn, Data) ->
+log_msg(Fn, {Pid, Format, Args}) ->
+    luger:Fn("sasl", io_lib:format("~p " ++ Format, [Pid | Args])).
+
+log_report(Fn, Data) ->
     luger:Fn("sasl", io_lib:format("~p", [Data])).

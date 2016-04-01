@@ -100,7 +100,7 @@ error_logger_test_() ->
      [
       {"basic error logger",
        fun () ->
-               error_logger:error_msg("error_msg"),
+               error_logger:error_msg("error_msg: ~p ~p", [{blah, blah}, bleh]),
                error_logger:error_report("error_report")
        end}
      ]}.
