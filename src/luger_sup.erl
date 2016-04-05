@@ -22,8 +22,8 @@ args() ->
     {ok, AppName} = application:get_env(app_name),
     HostName = luger_utils:hostname(),
     Statsd = case application:get_env(statsd) of
-                 {ok, Value} -> Value;
-                 _ -> false
+                 {ok, Value} when is_boolean(Value) -> Value;
+                 undefined -> false
              end,
     #config{app = luger_utils:appname(AppName),
             host = HostName,
@@ -44,9 +44,15 @@ stderr_args() ->
     #stderr_config{min_priority = MinPriority}.
 
 syslog_udp_args() ->
-    {ok, Host} = application:get_env(syslog_udp_host),
-    {ok, Port} = application:get_env(syslog_udp_port),
-    {ok, Facility} = application:get_env(syslog_udp_facility),
+    Host = case application:get_env(syslog_udp_host) of
+               {ok, H} when is_tuple(H) -> H
+           end,
+    Port = case application:get_env(syslog_udp_port) of
+               {ok, P} when is_integer(P) -> P
+           end,
+    Facility = case application:get_env(syslog_udp_facility) of
+                   {ok, F} when is_integer(F) andalso F >= 0 andalso F =< 23 -> F
+               end,
     #syslog_udp_config{host = Host, port = Port, facility = Facility}.
 
 init([]) ->
