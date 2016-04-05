@@ -46,7 +46,8 @@ stderr_args() ->
 syslog_udp_args() ->
     {ok, Host} = application:get_env(syslog_udp_host),
     {ok, Port} = application:get_env(syslog_udp_port),
-    #syslog_udp_config{host = Host, port = Port}.
+    {ok, Facility} = application:get_env(syslog_udp_facility),
+    #syslog_udp_config{host = Host, port = Port, facility = Facility}.
 
 init([]) ->
     Args = args(),

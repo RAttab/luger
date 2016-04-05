@@ -15,7 +15,6 @@
 -behaviour(supervisor_bridge).
 -export([init/1, terminate/2]).
 
--define(BASE_PRIORITY, 1 * 8).
 -define(DEFAULT_PRIORITY, ?BASE_PRIORITY + 4).
 -define(PROC_NAME, luger).
 -define(TABLE, luger).
@@ -107,7 +106,8 @@ debug(Channel, Format, Args) ->
           stderr_min_priority = ?WARNING  :: integer(),
           syslog_udp_socket = undefined   :: undefined | socket(),
           syslog_udp_host   = undefined   :: undefined | string(),
-          syslog_udp_port   = undefined   :: undefined | integer()
+          syslog_udp_port   = undefined   :: undefined | integer(),
+          syslog_udp_facility = undefined :: undefined | integer()
          }).
 
 init([#config{app = AppName, host = HostName, statsd = Statsd}, SinkConfig]) ->
@@ -133,12 +133,15 @@ terminate(_Reason, _State) ->
 init_sink(State = #state{}, #stderr_config{ min_priority = MinPriority }) ->
     State#state{type = stderr,
                 stderr_min_priority = MinPriority};
-init_sink(State = #state{}, #syslog_udp_config{ host = Host, port = Port }) ->
+init_sink(State = #state{}, #syslog_udp_config{ host = Host,
+                                                port = Port,
+                                                facility = Facility }) ->
     {ok, Socket} = inet_udp:open(0),
     State#state{type = syslog_udp,
                 syslog_udp_socket = Socket,
                 syslog_udp_host = Host,
-                syslog_udp_port = Port}.
+                syslog_udp_port = Port,
+                syslog_udp_facility = Facility}.
 
 log(Priority, Channel, Message) ->
     case whereis(?PROC_NAME) of
@@ -150,8 +153,8 @@ do_log(Priority, Channel, Message) ->
     [{state, State}] = ets:lookup(?TABLE, state),
 
     {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:universal_time(),
-    Data = [io_lib:format("<~B> ~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ",
-                          [Priority, Year, Month, Day, Hour, Min, Sec]),
+    Data = [io_lib:format("~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ",
+                          [Year, Month, Day, Hour, Min, Sec]),
             State#state.app, $\s,
             State#state.host, $\s,
             io_lib:format("~p ", [self()]),
@@ -162,20 +165,33 @@ do_log(Priority, Channel, Message) ->
     record_metric(Priority, State#state.statsd),
     ok.
 
-log_to(Priority, stderr, Data, #state{stderr_min_priority = MinPriority}) when Priority =< MinPriority ->
-    io:put_chars(standard_error, [Data, $\n]);
-log_to(_Priority, stderr, _Data, _State) ->
-    ok;
+stderr_priority(?EMERGENCY) -> <<"<emergency>">>;
+stderr_priority(?ALERT) -> <<"<alert>">>;
+stderr_priority(?CRITICAL) -> <<"<critical>">>;
+stderr_priority(?ERROR) -> <<"<error>">>;
+stderr_priority(?WARNING) -> <<"<warning>">>;
+stderr_priority(?NOTICE) -> <<"<notice>">>;
+stderr_priority(?INFO) -> <<"<info>">>;
+stderr_priority(?DEBUG) -> <<"<debug>">>.
 
-log_to(Priority, syslog_udp, Data, State = #state{syslog_udp_socket = Socket,
-                                                  syslog_udp_host = Host,
-                                                  syslog_udp_port = Port}) ->
-    case inet_udp:send(Socket, Host, Port, Data) of
+log_to(Priority, stderr, Data, #state{stderr_min_priority = MinPriority}) ->
+    case Priority of
+        _ when Priority =< MinPriority ->
+            io:put_chars(standard_error, [stderr_priority(Priority), " ", Data, $\n]);
+        _ -> ok
+    end;
+
+log_to(Priority, syslog_udp, Data0, State = #state{syslog_udp_socket = Socket,
+                                                   syslog_udp_host = Host,
+                                                   syslog_udp_port = Port,
+                                                   syslog_udp_facility = Facility}) ->
+    Data1 = ["<", integer_to_list(Facility * 8 + Priority), "> ", Data0],
+    case inet_udp:send(Socket, Host, Port, Data1) of
         ok -> ok;
         {error, Reason} ->
             io:format("ERROR: unable to log to syslog over udp with ~p: ~s~n",
                       [{Socket, Host, Port}, Reason]),
-            log_to(Priority, stderr, Data, State)
+            log_to(Priority, stderr, Data0, State)
     end.
 
 record_metric(Priority, true) ->

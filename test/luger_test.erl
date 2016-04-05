@@ -65,6 +65,7 @@ syslog_test_() ->
              application:set_env(luger, type, syslog_udp),
              application:set_env(luger, syslog_udp_host, {127, 0, 0, 1}),
              application:set_env(luger, syslog_udp_port, 514),
+             application:set_env(luger, syslog_udp_facility, 23),
              application:start(luger)
      end,
      fun(_) ->
