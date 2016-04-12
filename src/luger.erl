@@ -155,8 +155,8 @@ do_log(Priority, Channel, Message) ->
     {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:universal_time(),
     Data = [io_lib:format("~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ",
                           [Year, Month, Day, Hour, Min, Sec]),
-            State#state.app, $\s,
             State#state.host, $\s,
+            State#state.app, $\s,
             io_lib:format("~p ", [self()]),
             luger_utils:channel(Channel), $\s,
             Message],
@@ -185,7 +185,7 @@ log_to(Priority, syslog_udp, Data0, State = #state{syslog_udp_socket = Socket,
                                                    syslog_udp_host = Host,
                                                    syslog_udp_port = Port,
                                                    syslog_udp_facility = Facility}) ->
-    Data1 = ["<", integer_to_list(Facility * 8 + Priority), "> ", Data0],
+    Data1 = ["<", integer_to_list(Facility * 8 + Priority), ">1 ", Data0],
     case inet_udp:send(Socket, Host, Port, Data1) of
         ok -> ok;
         {error, Reason} ->
