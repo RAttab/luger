@@ -159,6 +159,7 @@ do_log(Priority, Channel, Message) ->
             State#state.app, $\s,
             io_lib:format("~p ", [self()]),
             luger_utils:channel(Channel), $\s,
+            $\s, % structured message
             Message],
     log_to(Priority, State#state.type, Data, State),
 
