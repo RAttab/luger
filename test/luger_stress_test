@@ -1,0 +1,22 @@
+#! /usr/bin/env escript
+
+%%! -smp enable -sname luger_stress_test -pz ebin
+
+send_proc(Parent) ->
+    [luger:error("blah", "bleh") || _ <- lists:seq(0, 128 * 128)],
+    Parent ! {self(), ok}.
+
+main(_) ->
+    ok = application:load(luger),
+    ok = application:set_env(luger, app_name, "luger_test"),
+    ok = application:set_env(luger, type, syslog_udp),
+    ok = application:set_env(luger, syslog_udp_host, {127, 0, 0, 1}),
+    ok = application:set_env(luger, syslog_udp_port, 514),
+    ok = application:set_env(luger, syslog_udp_facility, 23),
+    ok = application:start(luger),
+
+    Parent = self(),
+    Children = [spawn(fun() -> send_proc(Parent) end) || _ <- lists:seq(0, 128)],
+    [receive {Child, ok} -> erlang:display({done, Child}), ok end || Child <- Children].
+
+
