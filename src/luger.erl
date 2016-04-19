@@ -152,7 +152,7 @@ log(Priority, Channel, Message) ->
 do_log(Priority, Channel, Message) ->
     [{state, State}] = ets:lookup(?TABLE, state),
 
-    {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:universal_time(),
+    {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:local_time(),
     Data = [io_lib:format("~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ",
                           [Year, Month, Day, Hour, Min, Sec]),
             State#state.host, $\s,
