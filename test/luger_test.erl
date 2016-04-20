@@ -28,8 +28,8 @@ stderr_test_() ->
        end},
       {"trunc",
        fun () ->
-               ok = luger:alert("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbb", "msg"),
-               ok = luger:alert(<<"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbb">>, "msg")
+               ok = luger:alert(string:chars($a, 32, "b"), "msg"),
+               ok = luger:alert("trunc", string:chars($a, 2048, "b"))
        end}
      ]}.
 

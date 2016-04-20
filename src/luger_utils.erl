@@ -4,6 +4,7 @@
 -export([appname/1,
          hostname/0,
          channel/1,
+         message/1,
          priority_to_list/1]).
 
 %%-----------------------------------------------------------------
@@ -27,6 +28,9 @@ hostname() ->
 
 channel(Name) ->
     trunc(32, Name).
+
+message(Msg) ->
+    trunc(2048, Msg).
 
 priority_to_list(?EMERGENCY) -> "emergency";
 priority_to_list(?ALERT) -> "alert";
