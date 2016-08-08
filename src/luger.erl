@@ -18,6 +18,7 @@
 -define(DEFAULT_PRIORITY, ?BASE_PRIORITY + 4).
 -define(PROC_NAME, luger).
 -define(TABLE, luger).
+-define(THROTTLE_THRESHOLD, 5).
 
 
 %%-----------------------------------------------------------------
@@ -144,14 +145,46 @@ init_sink(State = #state{}, #syslog_udp_config{ host = Host,
                 syslog_udp_facility = Facility}.
 
 log(Priority, Channel, Message) ->
-    case whereis(?PROC_NAME) of
-        undefined -> {error, luger_not_running};
-        _ -> do_log(Priority, Channel, Message)
-    end.
+    log(Priority, Channel, Message, whereis(?PROC_NAME)).
 
-do_log(Priority, Channel, Message) ->
+log(_Priority, _Channel, _Message, undefined) ->
+    {error, luger_not_running};
+log(Priority, Channel, Message, _) ->
     [{state, State}] = ets:lookup(?TABLE, state),
 
+    Now = erlang:monotonic_time(seconds),
+    Throttle = throttle_channel(Channel, Now, ets:lookup(?TABLE, Channel)),
+
+    log(State, Priority, Channel, Message, Throttle).
+
+
+log(_State, _Priority, _Channel, _Message, throttled) ->
+    throttled;
+log(State, Priority, Channel, Message, _) ->
+    record_metrics(State, Priority, Channel),
+    do_log(State, Priority, Channel, Message).
+
+
+throttle_channel(Channel, Now, [{Channel, _, LastUpdate}])
+  when Now > LastUpdate ->
+    ets:insert(?TABLE, {Channel, 1, Now});
+throttle_channel(Channel, _Now, [{Channel, Freq, _}])
+  when Freq < ?THROTTLE_THRESHOLD ->
+    ets:update_counter(?TABLE, Channel, {2, 1});
+throttle_channel(_Channel, _Now, [{_, _, _}]) ->
+    throttled;
+throttle_channel(Channel, Now, _) ->
+    ets:insert(?TABLE, {Channel, 1, Now}).
+
+
+record_metrics(#state{statsd = true}, Priority, Channel) ->
+    Key = [<<"luger.">>, luger_utils:priority_to_list(Priority), $., Channel],
+    statsderl:increment(Key, 1, 1.0);
+record_metrics(#state{statsd = false}, _Priority, _Channel) ->
+    ok.
+
+
+do_log(State, Priority, Channel, Message) ->
     {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:local_time(),
     Data = [io_lib:format("~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ",
                           [Year, Month, Day, Hour, Min, Sec]),
@@ -161,10 +194,7 @@ do_log(Priority, Channel, Message) ->
             luger_utils:channel(Channel), $\s,
             $\s, % structured message
             luger_utils:message(Message)],
-    log_to(Priority, State#state.type, Data, State),
-
-    record_metric(Priority, State#state.statsd),
-    ok.
+    log_to(Priority, State#state.type, Data, State).
 
 stderr_priority(?EMERGENCY) -> <<"<emergency>">>;
 stderr_priority(?ALERT) -> <<"<alert>">>;
@@ -178,7 +208,7 @@ stderr_priority(?DEBUG) -> <<"<debug>">>.
 log_to(Priority, stderr, Data, #state{stderr_min_priority = MinPriority}) ->
     case Priority of
         _ when Priority =< MinPriority ->
-            io:put_chars(standard_error, [stderr_priority(Priority), " ", Data, $\n]);
+            luger_utils:send_stderr([stderr_priority(Priority), " ", Data, $\n]);
         _ -> ok
     end;
 
@@ -187,16 +217,10 @@ log_to(Priority, syslog_udp, Data0, State = #state{syslog_udp_socket = Socket,
                                                    syslog_udp_port = Port,
                                                    syslog_udp_facility = Facility}) ->
     Data1 = ["<", integer_to_list(Facility * 8 + Priority), ">1 ", Data0],
-    case inet_udp:send(Socket, Host, Port, Data1) of
+    case luger_utils:send_syslog(Socket, Host, Port, Data1) of
         ok -> ok;
         {error, Reason} ->
             io:format("ERROR: unable to log to syslog over udp with ~p: ~s~n",
                       [{Socket, Host, Port}, Reason]),
             log_to(Priority, stderr, Data0, State)
     end.
-
-record_metric(Priority, true) ->
-    Key = [<<"luger.">>, luger_utils:priority_to_list(Priority)],
-    statsderl:increment(Key, 1, 1.0);
-record_metric(_Priority, false) ->
-    ok.

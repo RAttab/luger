@@ -5,11 +5,10 @@
          hostname/0,
          channel/1,
          message/1,
-         priority_to_list/1]).
-
-%%-----------------------------------------------------------------
-%% implementation
-%%-----------------------------------------------------------------
+         priority_to_list/1,
+         send_stderr/1,
+         send_syslog/4
+        ]).
 
 trunc(N, S) when is_binary(S) ->
     case S of
@@ -40,3 +39,13 @@ priority_to_list(?WARNING) -> "warning";
 priority_to_list(?NOTICE) -> "notice";
 priority_to_list(?INFO) -> "info";
 priority_to_list(?DEBUG) -> "debug".
+
+
+%% Exist so we can trap the call via meck without disrupting other
+%% parts of the system. Need to come up with something better.
+
+send_stderr(Line) ->
+    io:put_chars(standard_error, Line).
+
+send_syslog(Socket, Host, Port, Line) ->
+    inet_udp:send(Socket, Host, Port, Line).
