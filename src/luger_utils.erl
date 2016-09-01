@@ -6,7 +6,7 @@
          channel/1,
          message/1,
          priority_to_list/1,
-         send_stderr/1,
+         send_stderr/1, send_stderr/2,
          send_syslog/4
         ]).
 
@@ -44,8 +44,12 @@ priority_to_list(?DEBUG) -> "debug".
 %% Exist so we can trap the call via meck without disrupting other
 %% parts of the system. Need to come up with something better.
 
+send_stderr(IoDevice, Line) ->
+    io:format(IoDevice, "~p", [iolist_to_binary(Line)]).
+
 send_stderr(Line) ->
-    io:put_chars(standard_error, Line).
+    send_stderr(standard_error, Line).
+
 
 send_syslog(Socket, Host, Port, Line) ->
     inet_udp:send(Socket, Host, Port, Line).

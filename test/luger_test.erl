@@ -62,7 +62,66 @@ no_start_test_() ->
          end)
      ]}.
 
+basics_test_() ->
+    {foreach,
+     fun() ->
+             application:load(luger),
+             application:set_env(luger, app_name, "luger_test"),
+             application:set_env(luger, type, stderr),
+             application:set_env(luger, statsd, false),
+             application:start(luger),
+             setup()
 
+     end,
+     fun(Logger) ->
+             terminate(Logger),
+             application:stop(luger)
+     end,
+
+     [
+      ?T("basics - channel",
+         begin
+             ok = luger:alert("channels.string", "blah"),
+             ?assert_log_line(Logger, stderr, alert, "channels.string", "blah"),
+
+             ok = luger:alert(<<"channels.bin">>, "blah"),
+             ?assert_log_line(Logger, stderr, alert, "channels.bin", "blah"),
+
+             ok = luger:alert(["channels", [$., <<"iolist">>]], "blah"),
+             ?assert_log_line(Logger, stderr, alert, "channels.iolist", "blah"),
+
+             ok = luger:alert([128 | ".channels.encoding.string"], "blah"),
+             ?assert_log_line(Logger, stderr, alert, [128, ".channels.encoding.string"], "blah"),
+
+             ok = luger:alert(<<128, ".channels.encoding.bin">>, "blah"),
+             ?assert_log_line(Logger, stderr, alert, [128 | ".channels.encoding.bin"], "blah"),
+
+             ?assert_log_empty(Logger)
+         end),
+
+      ?T("basics - message",
+         begin
+             ok = luger:alert("messages.string", "blah"),
+             ?assert_log_line(Logger, stderr, alert, "messages.string", "blah"),
+
+             ok = luger:alert("messages.bin", <<"blah">>),
+             ?assert_log_line(Logger, stderr, alert, "messages.bin", "blah"),
+
+             ok = luger:alert("messages.iolist", [<<"foo">>, $\s, "bar"]),
+             ?assert_log_line(Logger, stderr, alert, "messages.iolist", "foo bar"),
+
+             ok = luger:alert("messages.fmt", "~p ~s", [foo, "bar"]),
+             ?assert_log_line(Logger, stderr, alert, "messages.fmt", "foo bar"),
+
+             ok = luger:alert("messages.encoding.string", [128 | "blah"]),
+             ?assert_log_line(Logger, stderr, alert, "messages.encoding.string", [128 | "blah"]),
+
+             ok = luger:alert("messages.encoding.bin", <<128, "blah">>),
+             ?assert_log_line(Logger, stderr, alert, "messages.encoding.bin", <<128, "blah">>),
+
+             ?assert_log_empty(Logger)
+         end)
+     ]}.
 
 stderr_test_() ->
     {foreach,
@@ -354,11 +413,19 @@ logger_count(Logger, Source, Acc) ->
 setup() ->
     Logger = spawn(fun() -> logger_loop() end),
 
+    % This file handle intentionally gets leaked.
+    {ok, SinkHole} = file:open("/dev/null", write),
+
     meck:new(luger_utils, [passthrough]),
-    meck:expect(luger_utils, send_stderr,
-                fun (Line) -> Logger ! {log, stderr, Line}, ok end),
     meck:expect(luger_utils, send_syslog,
                 fun (_, _, _, Line) -> Logger ! {log, syslog, Line}, ok end),
+    meck:expect(luger_utils, send_stderr,
+                fun (Line) ->
+                        % Forwarding to /dev/null tests for encoding
+                        % issues.
+                        luger_utils:send_stderr(SinkHole, Line),
+                        Logger ! {log, stderr, Line}, ok
+                end),
 
     meck:new(statsderl),
     meck:expect(statsderl, increment,
