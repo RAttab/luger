@@ -19,9 +19,9 @@ start_link() ->
 %%-----------------------------------------------------------------
 
 args() ->
-    {ok, AppName} = application:get_env(app_name),
+    {ok, AppName} = application:get_env(luger, app_name),
     HostName = luger_utils:hostname(),
-    Statsd = case application:get_env(statsd) of
+    Statsd = case application:get_env(luger, statsd) of
                  {ok, Value} when is_boolean(Value) -> Value;
                  undefined -> false
              end,
@@ -30,7 +30,8 @@ args() ->
             statsd = Statsd }.
 
 stderr_args() ->
-    MinPriority = case application:get_env(stderr_min_priority) of
+    MsgCap = application:get_env(luger, stderr_msg_cap, undefined),
+    MinPriority = case application:get_env(luger, stderr_min_priority) of
                       undefined -> ?WARNING;
                       {ok, emergency} -> ?EMERGENCY;
                       {ok, alert} -> ?ALERT;
@@ -41,23 +42,23 @@ stderr_args() ->
                       {ok, info} -> ?INFO;
                       {ok, debug} -> ?DEBUG
                       end,
-    #stderr_config{min_priority = MinPriority}.
+    #stderr_config{min_priority = MinPriority, msg_cap = MsgCap}.
 
 syslog_udp_args() ->
-    Host = case application:get_env(syslog_udp_host) of
+    Host = case application:get_env(luger, syslog_udp_host) of
                {ok, H} when is_tuple(H) -> H
            end,
-    Port = case application:get_env(syslog_udp_port) of
+    Port = case application:get_env(luger, syslog_udp_port) of
                {ok, P} when is_integer(P) -> P
            end,
-    Facility = case application:get_env(syslog_udp_facility) of
+    Facility = case application:get_env(luger, syslog_udp_facility) of
                    {ok, F} when is_integer(F) andalso F >= 0 andalso F =< 23 -> F
                end,
     #syslog_udp_config{host = Host, port = Port, facility = Facility}.
 
 init([]) ->
     Args = args(),
-    SinkArgs = case application:get_env(type) of
+    SinkArgs = case application:get_env(luger, type) of
                undefined -> stderr_args();
                {ok, stderr} -> stderr_args();
                {ok, syslog_udp} -> syslog_udp_args()

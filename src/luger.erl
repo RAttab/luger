@@ -104,7 +104,10 @@ debug(Channel, Format, Args) ->
           host                            :: string(),
           statsd                          :: boolean(),
           type                            :: stderr | syslog_udp,
+
           stderr_min_priority = ?WARNING  :: integer(),
+          stderr_msg_cap      = undefined :: undefined | integer(),
+
           syslog_udp_socket = undefined   :: undefined | socket(),
           syslog_udp_host   = undefined   :: undefined | string(),
           syslog_udp_port   = undefined   :: undefined | integer(),
@@ -131,9 +134,11 @@ terminate(_Reason, _State) ->
 %% implementation
 %%-----------------------------------------------------------------
 
-init_sink(State = #state{}, #stderr_config{ min_priority = MinPriority }) ->
+init_sink(State = #state{}, #stderr_config{ min_priority = MinPriority,
+                                            msg_cap = MsgCap }) ->
     State#state{type = stderr,
-                stderr_min_priority = MinPriority};
+                stderr_min_priority = MinPriority,
+                stderr_msg_cap = MsgCap};
 init_sink(State = #state{}, #syslog_udp_config{ host = Host,
                                                 port = Port,
                                                 facility = Facility }) ->
@@ -186,14 +191,20 @@ record_metrics(#state{statsd = false}, _Priority, _Channel) ->
 
 do_log(State, Priority, Channel, Message) ->
     {{Year, Month, Day}, {Hour, Min, Sec}} = calendar:local_time(),
+
+    MsgCap = case State#state.type of
+                  stderr -> State#state.stderr_msg_cap;
+                  syslog_udp -> 2048 % Message limit based on UDP packet size
+             end,
+
     Data = [io_lib:format("~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B ",
                           [Year, Month, Day, Hour, Min, Sec]),
             State#state.host, $\s,
             State#state.app, $\s,
-            io_lib:format("~p ", [self()]),
+            io_lib:format("~p", [self()]), $\s,
             luger_utils:channel(Channel), $\s,
             $\s, % structured message
-            luger_utils:message(Message)],
+            luger_utils:message(Message, MsgCap)],
     log_to(Priority, State#state.type, Data, State).
 
 stderr_priority(?EMERGENCY) -> <<"<emergency>">>;

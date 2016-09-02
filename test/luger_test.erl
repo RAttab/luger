@@ -70,6 +70,7 @@ stderr_test_() ->
              application:load(luger),
              application:set_env(luger, app_name, "luger_test"),
              application:set_env(luger, type, stderr),
+             application:set_env(luger, stderr_msg_cap, 2048),
              application:set_env(luger, statsd, false),
              application:start(luger),
              setup()

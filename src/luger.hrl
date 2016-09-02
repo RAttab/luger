@@ -15,4 +15,5 @@
                              port     :: integer(),
                              facility :: integer() }).
 
--record(stderr_config, { min_priority :: integer() }).
+-record(stderr_config, { min_priority :: integer(),
+                         msg_cap      :: undefined | integer()}).

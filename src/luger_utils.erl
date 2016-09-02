@@ -4,7 +4,7 @@
 -export([appname/1,
          hostname/0,
          channel/1,
-         message/1,
+         message/2,
          priority_to_list/1,
          send_stderr/1,
          send_syslog/4
@@ -28,8 +28,11 @@ hostname() ->
 channel(Name) ->
     trunc(32, Name).
 
-message(Msg) ->
-    trunc(2048, Msg).
+message(Msg, undefined) ->
+    Msg;
+message(Msg, Cap) ->
+    trunc(Cap, Msg).
+
 
 priority_to_list(?EMERGENCY) -> "emergency";
 priority_to_list(?ALERT) -> "alert";
