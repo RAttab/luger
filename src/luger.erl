@@ -103,7 +103,7 @@ debug(Channel, Format, Args) ->
           app                             :: string(),
           host                            :: string(),
           statsd                          :: boolean(),
-          type                            :: stderr | syslog_udp,
+          type                            :: null | stderr | syslog_udp,
           stderr_min_priority = ?WARNING  :: integer(),
           syslog_udp_socket = undefined   :: undefined | socket(),
           syslog_udp_host   = undefined   :: undefined | string(),
@@ -131,6 +131,8 @@ terminate(_Reason, _State) ->
 %% implementation
 %%-----------------------------------------------------------------
 
+init_sink(State = #state{}, #null_config{}) ->
+    State#state{type = null};
 init_sink(State = #state{}, #stderr_config{ min_priority = MinPriority }) ->
     State#state{type = stderr,
                 stderr_min_priority = MinPriority};
@@ -205,6 +207,8 @@ stderr_priority(?NOTICE) -> <<"<notice>">>;
 stderr_priority(?INFO) -> <<"<info>">>;
 stderr_priority(?DEBUG) -> <<"<debug>">>.
 
+log_to(_Priority, null, _Data, _State) ->
+    ok;
 log_to(Priority, stderr, Data, #state{stderr_min_priority = MinPriority}) ->
     case Priority of
         _ when Priority =< MinPriority ->

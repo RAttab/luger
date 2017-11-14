@@ -16,3 +16,5 @@
                              facility :: integer() }).
 
 -record(stderr_config, { min_priority :: integer() }).
+
+-record(null_config, {}).

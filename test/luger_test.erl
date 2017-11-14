@@ -39,6 +39,7 @@
 
 -define(assert_log_empty(Logger),
         begin
+            ?assertMatch(undefined, logger_get(Logger, null)),
             ?assertMatch(undefined, logger_get(Logger, syslog)),
             ?assertMatch(undefined, logger_get(Logger, stderr)),
             ?assertMatch(undefined, logger_get(Logger, statsd))
@@ -326,6 +327,38 @@ statsd_test_() ->
              ?assert_log_empty(Logger)
          end)
      ]}.
+
+
+null_test_() ->
+    {foreach,
+     fun() ->
+             application:load(luger),
+             application:set_env(luger, app_name, "luger_null_test"),
+             application:set_env(luger, type, null),
+             application:set_env(luger, statsd, false),
+             application:start(luger),
+             setup()
+     end,
+     fun(Logger) ->
+             terminate(Logger),
+             application:stop(luger)
+     end,
+     [
+      ?T("log nothing",
+         begin
+             ok = luger:emergency("null.prio.emergency", "format: ~s", ["blah"]),
+             ok = luger:alert("null.prio.alert", "format: ~s", ["blah"]),
+             ok = luger:critical("null.prio.critical", "format: ~s", ["blah"]),
+             ok = luger:error("null.prio.error", "format: ~B", [10]),
+             ok = luger:warning("null.prio.warning", "format: ~p", [blah]),
+             ok = luger:info("null.prio.info", "msg"),
+             ok = luger:notice("null.prio.notice", "msg"),
+             ok = luger:debug("null.prio.debug", "msg"),
+             ?assert_log_empty(Logger)
+         end)
+     ]
+    }.
+
 
 %% These tests might be a bit flaky due to their reliance on
 %% time. They were design to reduce this flakyness though at the cost
