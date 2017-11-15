@@ -59,6 +59,7 @@ init([]) ->
     Args = args(),
     SinkArgs = case application:get_env(type) of
                undefined -> stderr_args();
+               {ok, null} -> #null_config {};
                {ok, stderr} -> stderr_args();
                {ok, syslog_udp} -> syslog_udp_args()
            end,
