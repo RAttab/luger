@@ -64,5 +64,10 @@ init([]) ->
                {ok, syslog_udp} -> syslog_udp_args()
            end,
 
-    Children = [{luger, {luger, start_link, [Args, SinkArgs]}, permanent, 1000, worker, [luger]}],
+    SingleLine = case application:get_env(single_line) of
+                     {ok, true} -> true;
+                     _ -> false
+                 end,
+
+    Children = [{luger, {luger, start_link, [Args, SinkArgs, SingleLine]}, permanent, 1000, worker, [luger]}],
     {ok, {{one_for_one, 0, 1}, Children}}.

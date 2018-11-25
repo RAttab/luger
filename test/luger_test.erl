@@ -404,6 +404,33 @@ throttling_test_() ->
          end)
      ]}.
 
+single_line_test_() ->
+    {foreach,
+     fun() ->
+             application:load(luger),
+             application:set_env(luger, app_name, "luger_test"),
+             application:set_env(luger, single_line, true),
+             application:set_env(luger, type, stderr),
+             application:set_env(luger, statsd, false),
+             application:start(luger),
+             setup()
+     end,
+     fun(Logger) ->
+             terminate(Logger),
+             application:stop(luger)
+     end,
+     [
+
+      ?T("single line",
+         begin
+             luger:alert("topic", "blah \n   blah\n\n\n blah   \n   "),
+             ?assert_log_line(Logger, stderr, alert, "topic", "blah blah blah"),
+
+             luger:alert("topic", "blah     blah blah      "),
+             ?assert_log_line(Logger, stderr, alert, "topic", "blah blah blah")
+         end)
+     ]}.
+
 
 format_log(stderr, Priority, Channel, Message) ->
     io_lib:format(

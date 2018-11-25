@@ -1,7 +1,7 @@
 -module(luger).
 -include("luger.hrl").
 
--export([start_link/2,
+-export([start_link/3,
          emergency/2, emergency/3,
          alert/2, alert/3,
          critical/2, critical/3,
@@ -25,9 +25,9 @@
 %% public interface
 %%-----------------------------------------------------------------
 
--spec start_link(tuple(), tuple()) -> {ok, pid()} | {error, any()}.
-start_link(Config, SinkConfig) ->
-    supervisor_bridge:start_link(?MODULE, [Config, SinkConfig]).
+-spec start_link(tuple(), tuple(), boolean()) -> {ok, pid()} | {error, any()}.
+start_link(Config, SinkConfig, SingleLine) ->
+    supervisor_bridge:start_link(?MODULE, [Config, SinkConfig, SingleLine]).
 
 -spec emergency(string(), string()) -> ok | {error, luger_not_running}.
 emergency(Channel, Message) ->
@@ -103,6 +103,7 @@ debug(Channel, Format, Args) ->
           app                             :: string(),
           host                            :: string(),
           statsd                          :: boolean(),
+          single_line                     :: boolean(),
           type                            :: null | stderr | syslog_udp,
           stderr_min_priority = ?WARNING  :: integer(),
           syslog_udp_socket = undefined   :: undefined | socket(),
@@ -111,14 +112,14 @@ debug(Channel, Format, Args) ->
           syslog_udp_facility = undefined :: undefined | integer()
          }).
 
-init([#config{app = AppName, host = HostName, statsd = Statsd}, SinkConfig]) ->
+init([#config{app = AppName, host = HostName, statsd = Statsd}, SinkConfig, SingleLine]) ->
     register(?PROC_NAME, self()),
     ok = error_logger:add_report_handler(luger_error_logger),
 
     State = init_sink(#state{app = AppName, host = HostName, statsd = Statsd}, SinkConfig),
 
     ets:new(?TABLE, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
-    true = ets:insert_new(?TABLE, {state, State}),
+    true = ets:insert_new(?TABLE, {state, State#state{ single_line = SingleLine}}),
 
     {ok, self(), undefined}.
 
@@ -195,7 +196,7 @@ do_log(State, Priority, Channel, Message) ->
             io_lib:format("~p ", [self()]),
             luger_utils:channel(Channel), $\s,
             $\s, % structured message
-            luger_utils:message(Message)],
+            luger_utils:message(Message, State#state.single_line)],
     log_to(Priority, State#state.type, Data, State).
 
 stderr_priority(?EMERGENCY) -> <<"<emergency>">>;
