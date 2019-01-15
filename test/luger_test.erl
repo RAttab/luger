@@ -10,7 +10,7 @@
         fun() ->
                 ExpKey1 = iolist_to_binary(ExpKey),
 
-                {Key, Count} = case logger_get(Logger, statsd) of L when L /= undefined -> L end,
+                [{Key, Count}] = case logger_get(Logger, statsd) of L when L /= undefined -> L end,
                 Key1 = iolist_to_binary(Key),
 
                 ?assertMatch({ExpKey1, ExpCount}, {Key1, Count})
@@ -18,16 +18,15 @@
 
 -define(assert_log_line(Logger, Source, ExpPriority, ExpChannel, ExpMessage),
         fun() ->
-                Line = case logger_get(Logger, Source) of L when L /= undefined -> L end,
+                [Line] = case logger_get(Logger, Source) of L when L /= undefined -> L end,
                 ExpLine = format_log(Source, ExpPriority, ExpChannel, ExpMessage),
                 ?assertEqual(iolist_to_binary(ExpLine), iolist_to_binary(Line))
         end()).
 
--define(assert_log_count(Logger, Source, MinCount, MaxCount),
+-define(assert_log_count(Logger, Source, ExpectedCount),
         fun() ->
                 Count = logger_count(Logger, Source, 0),
-                ?assert(Count >= MinCount),
-                ?assert(Count =< MaxCount)
+                ?assert(Count == ExpectedCount)
         end()).
 
 
@@ -370,8 +369,12 @@ throttling_test_() ->
              application:set_env(luger, app_name, "luger_test"),
              application:set_env(luger, type, stderr),
              application:set_env(luger, statsd, true),
+             application:set_env(luger, throttle_threshold, 3),
              application:start(luger),
-             setup()
+             Logger = setup(),
+             meck:expect(luger_utils, get_time,
+                fun () -> luger_test_server:get_time() end),
+             Logger
      end,
      fun(Logger) ->
              terminate(Logger),
@@ -381,25 +384,27 @@ throttling_test_() ->
       ?T("throttling",
          begin
              [luger:alert("throttling.main", "msg") || _ <- lists:seq(0, 100)],
-             ?assert_log_count(Logger, stderr, 5, 10),
-             ?assert_log_count(Logger, statsd, 5, 10),
+             ?assert_log_count(Logger, stderr, 3),
+             ?assert_log_count(Logger, statsd, 3),
              ?assert_log_empty(Logger),
 
              luger:alert("throttling.other", "msg"),
-             ?assert_log_count(Logger, stderr, 1, 1),
-             ?assert_log_count(Logger, statsd, 1, 1),
+             ?assert_log_count(Logger, stderr, 1),
+             ?assert_log_count(Logger, statsd, 1),
              ?assert_log_empty(Logger),
 
-             timer:sleep(1000),
+             sleep(1000),
              luger:alert("throttling.main", "msg"),
-             ?assert_log_count(Logger, stderr, 1, 1),
-             ?assert_log_count(Logger, statsd, 1, 1),
+             % ensure luger emitted "dropped N messages", which will also call
+             % luger:record_metrics/3 one extra time
+             ?assert_log_count(Logger, stderr, 1 + 1),
+             ?assert_log_count(Logger, statsd, 1 + 1),
              ?assert_log_empty(Logger),
 
-             timer:sleep(1000),
+             sleep(1000),
              [luger:alert("throttling.main", "msg") || _ <- lists:seq(0, 100)],
-             ?assert_log_count(Logger, stderr, 5, 10),
-             ?assert_log_count(Logger, statsd, 5, 10),
+             ?assert_log_count(Logger, stderr, 3),
+             ?assert_log_count(Logger, statsd, 3),
              ?assert_log_empty(Logger)
          end)
      ]}.
@@ -448,48 +453,38 @@ format_log(syslog, Priority, Channel, Message) ->
       "<~p>1 0000-00-00T00:00:00 ~s luger_test ~p ~s  ~s",
       [PriorityNum, luger_utils:hostname(), self(), Channel, Message]).
 
-logger_loop() ->
-    receive
-        close -> ok;
-        {get, Source, Pid} ->
-            receive
-                {log, Source, Data} -> Pid ! {log, Source, Data}
-            after
-                0 -> Pid ! {log, Source, undefined}
-            end,
-            logger_loop()
-    end.
-
 logger_get(Logger, Source) ->
-    Logger ! {get, Source, self()},
-    receive {log, Source, Data} -> Data end.
+    gen_server:call(Logger, {get, Source}).
 
 logger_count(Logger, Source, Acc) ->
     case logger_get(Logger, Source) of
         undefined -> Acc;
-        _ -> logger_count(Logger, Source, Acc + 1)
+        Msgs -> logger_count(Logger, Source, Acc + length(Msgs))
     end.
 
+sleep(Ms) ->
+    luger_test_server:inc_time(Ms).
+
 setup() ->
-    Logger = spawn(fun() -> logger_loop() end),
+    {ok, Logger} = luger_test_server:start_link(),
 
     % This file handle intentionally gets leaked.
     {ok, SinkHole} = file:open("/dev/null", write),
 
     meck:new(luger_utils, [passthrough]),
     meck:expect(luger_utils, send_syslog,
-                fun (_, _, _, Line) -> Logger ! {log, syslog, Line}, ok end),
+                fun (_, _, _, Line) -> luger_test_server:log(syslog, Line) end),
     meck:expect(luger_utils, send_stderr,
                 fun (Line) ->
                         % Forwarding to /dev/null tests for encoding
                         % issues.
                         luger_utils:send_stderr(SinkHole, Line),
-                        Logger ! {log, stderr, Line}, ok
+                        luger_test_server:log(stderr, Line)
                 end),
 
     meck:new(statsderl),
     meck:expect(statsderl, increment,
-                fun (Key, Inc, _) -> Logger ! {log, statsd, {Key, Inc}} end),
+                fun (Key, Inc, _) -> luger_test_server:log(statsd, {Key, Inc}) end),
 
     meck:new(calendar, [unstick]),
     meck:expect(calendar, local_time, fun () -> ?NOW end),
