@@ -1,7 +1,7 @@
 -module(luger).
 -include("luger.hrl").
 
--export([start_link/3,
+-export([start_link/4,
          emergency/2, emergency/3,
          alert/2, alert/3,
          critical/2, critical/3,
@@ -18,16 +18,16 @@
 -define(DEFAULT_PRIORITY, ?BASE_PRIORITY + 4).
 -define(PROC_NAME, luger).
 -define(TABLE, luger).
--define(THROTTLE_THRESHOLD, 5).
 
 
 %%-----------------------------------------------------------------
 %% public interface
 %%-----------------------------------------------------------------
 
--spec start_link(tuple(), tuple(), boolean()) -> {ok, pid()} | {error, any()}.
-start_link(Config, SinkConfig, SingleLine) ->
-    supervisor_bridge:start_link(?MODULE, [Config, SinkConfig, SingleLine]).
+-spec start_link(tuple(), tuple(), boolean(), pos_integer()) -> {ok, pid()} | {error, any()}.
+start_link(Config, SinkConfig, SingleLine, ThrottleThreshold) ->
+    Conf = [Config, SinkConfig, SingleLine, ThrottleThreshold],
+    supervisor_bridge:start_link(?MODULE, Conf).
 
 -spec emergency(string(), string()) -> ok | {error, luger_not_running}.
 emergency(Channel, Message) ->
@@ -104,6 +104,7 @@ debug(Channel, Format, Args) ->
           host                            :: string(),
           statsd                          :: boolean(),
           single_line                     :: boolean(),
+          throttle_threshold = 5          :: pos_integer(),
           type                            :: null | stderr | syslog_udp,
           stderr_min_priority = ?WARNING  :: integer(),
           syslog_udp_socket = undefined   :: undefined | socket(),
@@ -112,14 +113,17 @@ debug(Channel, Format, Args) ->
           syslog_udp_facility = undefined :: undefined | integer()
          }).
 
-init([#config{app = AppName, host = HostName, statsd = Statsd}, SinkConfig, SingleLine]) ->
+init([#config{app = AppName, host = HostName, statsd = Statsd}, SinkConfig, SingleLine, ThrottleThreshold]) ->
     register(?PROC_NAME, self()),
     ok = error_logger:add_report_handler(luger_error_logger),
 
     State = init_sink(#state{app = AppName, host = HostName, statsd = Statsd}, SinkConfig),
 
     ets:new(?TABLE, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
-    true = ets:insert_new(?TABLE, {state, State#state{ single_line = SingleLine}}),
+    true = ets:insert_new(?TABLE, {state, State#state{
+        single_line = SingleLine,
+        throttle_threshold = ThrottleThreshold
+    }}),
 
     {ok, self(), undefined}.
 
@@ -155,28 +159,39 @@ log(_Priority, _Channel, _Message, undefined) ->
 log(Priority, Channel, Message, _) ->
     [{state, State}] = ets:lookup(?TABLE, state),
 
+    #state{throttle_threshold = Threshold} = State,
+
     Now = erlang:monotonic_time(seconds),
-    Throttle = throttle_channel(Channel, Now, ets:lookup(?TABLE, Channel)),
+    Throttle = throttle_channel(Channel, Now, ets:lookup(?TABLE, Channel), Threshold),
 
     log(State, Priority, Channel, Message, Throttle).
 
 
 log(_State, _Priority, _Channel, _Message, throttled) ->
     throttled;
+log(State, Priority, Channel, Message, {dropped, Count}) ->
+    DroppedMessage = ["dropped ", integer_to_list(Count), " messages"],
+    log(State, Priority, Channel, DroppedMessage, true),
+    log(State, Priority, Channel, Message, true);
 log(State, Priority, Channel, Message, _) ->
     record_metrics(State, Priority, Channel),
     do_log(State, Priority, Channel, Message).
 
 
-throttle_channel(Channel, Now, [{Channel, _, LastUpdate}])
+throttle_channel(Channel, Now, [{Channel, Count, LastUpdate}], Threshold)
   when Now > LastUpdate ->
-    ets:insert(?TABLE, {Channel, 1, Now});
-throttle_channel(Channel, _Now, [{Channel, Freq, _}])
-  when Freq < ?THROTTLE_THRESHOLD ->
+    ets:insert(?TABLE, {Channel, 1, Now}),
+    case Count > Threshold of
+        true -> {dropped, Count - Threshold};
+        _ -> true
+    end;
+throttle_channel(Channel, _Now, [{Channel, Freq, _}], Threshold)
+  when Freq < Threshold ->
     ets:update_counter(?TABLE, Channel, {2, 1});
-throttle_channel(_Channel, _Now, [{_, _, _}]) ->
+throttle_channel(_Channel, _Now, [{Channel, _, _}], _) ->
+    ets:update_counter(?TABLE, Channel, {2, 1}),
     throttled;
-throttle_channel(Channel, Now, _) ->
+throttle_channel(Channel, Now, _, _) ->
     ets:insert(?TABLE, {Channel, 1, Now}).
 
 
