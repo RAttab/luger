@@ -7,7 +7,8 @@
          message/2,
          priority_to_list/1,
          send_stderr/1, send_stderr/2,
-         send_syslog/4
+         send_syslog/4,
+         get_time/0
         ]).
 
 trunc(N, S) when is_binary(S) ->
@@ -58,3 +59,9 @@ send_stderr(Line) ->
 
 send_syslog(Socket, Host, Port, Line) ->
     inet_udp:send(Socket, Host, Port, Line).
+
+
+%% Used in order to mock time in test suite
+
+get_time() ->
+    erlang:monotonic_time(seconds).

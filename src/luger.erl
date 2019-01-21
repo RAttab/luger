@@ -161,7 +161,7 @@ log(Priority, Channel, Message, _) ->
 
     #state{throttle_threshold = Threshold} = State,
 
-    Now = erlang:monotonic_time(seconds),
+    Now = luger_utils:get_time(),
     Throttle = throttle_channel(Channel, Now, ets:lookup(?TABLE, Channel), Threshold),
 
     log(State, Priority, Channel, Message, Throttle).
