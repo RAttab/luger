@@ -69,5 +69,10 @@ init([]) ->
                      _ -> false
                  end,
 
-    Children = [{luger, {luger, start_link, [Args, SinkArgs, SingleLine]}, permanent, 1000, worker, [luger]}],
+    ThrottleThreshold = case application:get_env(throttle_threshold) of
+        {ok, Val} -> Val;
+        _ -> 5
+    end,
+
+    Children = [{luger, {luger, start_link, [Args, SinkArgs, SingleLine, ThrottleThreshold]}, permanent, 1000, worker, [luger]}],
     {ok, {{one_for_one, 0, 1}, Children}}.
