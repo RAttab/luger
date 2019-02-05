@@ -6,11 +6,10 @@
 -define(NOW, {{0, 0, 0}, {0, 0, 0}}).
 -define(FACILITY, 23).
 
--define(assert_statsd(Logger, ExpKey, ExpCount),
+-define(assert_optics(Logger, ExpKey, ExpCount),
         fun() ->
                 ExpKey1 = iolist_to_binary(ExpKey),
-
-                [{Key, Count}] = case logger_get(Logger, statsd) of L when L /= undefined -> L end,
+                [{Key, Count}] = case logger_get(Logger, optics) of L when L /= undefined -> L end,
                 Key1 = iolist_to_binary(Key),
 
                 ?assertMatch({ExpKey1, ExpCount}, {Key1, Count})
@@ -41,7 +40,7 @@
             ?assertMatch(undefined, logger_get(Logger, null)),
             ?assertMatch(undefined, logger_get(Logger, syslog)),
             ?assertMatch(undefined, logger_get(Logger, stderr)),
-            ?assertMatch(undefined, logger_get(Logger, statsd))
+            ?assertMatch(undefined, logger_get(Logger, optics))
         end).
 
 % I f'n hate eunit...
@@ -68,7 +67,7 @@ basics_test_() ->
              application:load(luger),
              application:set_env(luger, app_name, "luger_test"),
              application:set_env(luger, type, stderr),
-             application:set_env(luger, statsd, false),
+             application:set_env(luger, optics, false),
              application:start(luger),
              setup()
 
@@ -129,7 +128,7 @@ stderr_test_() ->
              application:load(luger),
              application:set_env(luger, app_name, "luger_test"),
              application:set_env(luger, type, stderr),
-             application:set_env(luger, statsd, false),
+             application:set_env(luger, optics, false),
              application:start(luger),
              setup()
      end,
@@ -281,19 +280,14 @@ error_logger_test_() ->
          end)
      ]}.
 
-statsd_test_() ->
+optics_test_() ->
     {foreach,
      fun() ->
-             application:load(statsderl),
-             application:set_env(statsderl, hostname, {127, 0, 0, 1}),
-             application:set_env(statsderl, port, 8125),
-             application:start(statsderl),
-
              application:load(luger),
              application:set_env(luger, app_name, "luger_test"),
              application:set_env(luger, type, stderr),
              application:set_env(luger, stderr_min_priority, warning),
-             application:set_env(luger, statsd, true),
+             application:set_env(luger, optics, true),
              application:start(luger),
 
              setup()
@@ -303,25 +297,25 @@ statsd_test_() ->
              application:stop(luger)
      end,
      [
-      ?T("statsd metrics",
+      ?T("optics metrics",
          begin
-             ok = luger:alert("statsd", "msg"),
-             ?assert_log_line(Logger, stderr, alert, "statsd", "msg"),
-             ?assert_statsd(Logger, "luger.alert.statsd", 1),
+             ok = luger:alert("optics", "msg"),
+             ?assert_log_line(Logger, stderr, alert, "optics", "msg"),
+             ?assert_optics(Logger, "luger.alert.optics", 1),
 
-             ok = luger:error("statsd", "msg"),
-             ?assert_log_line(Logger, stderr, error, "statsd", "msg"),
-             ?assert_statsd(Logger, "luger.error.statsd", 1),
+             ok = luger:error("optics", "msg"),
+             ?assert_log_line(Logger, stderr, error, "optics", "msg"),
+             ?assert_optics(Logger, "luger.error.optics", 1),
 
-             ok = luger:warning("statsd", "msg"),
-             ?assert_log_line(Logger, stderr, warning, "statsd", "msg"),
-             ?assert_statsd(Logger, "luger.warning.statsd", 1),
+             ok = luger:warning("optics", "msg"),
+             ?assert_log_line(Logger, stderr, warning, "optics", "msg"),
+             ?assert_optics(Logger, "luger.warning.optics", 1),
 
-             ok = luger:info("statsd", "msg"),
-             ?assert_statsd(Logger, "luger.info.statsd", 1),
+             ok = luger:info("optics", "msg"),
+             ?assert_optics(Logger, "luger.info.optics", 1),
 
-             ok = luger:debug("statsd", "msg"),
-             ?assert_statsd(Logger, "luger.debug.statsd", 1),
+             ok = luger:debug("optics", "msg"),
+             ?assert_optics(Logger, "luger.debug.optics", 1),
 
              ?assert_log_empty(Logger)
          end)
@@ -334,7 +328,7 @@ null_test_() ->
              application:load(luger),
              application:set_env(luger, app_name, "luger_null_test"),
              application:set_env(luger, type, null),
-             application:set_env(luger, statsd, false),
+             application:set_env(luger, optics, false),
              application:start(luger),
              setup()
      end,
@@ -368,7 +362,7 @@ throttling_test_() ->
              application:load(luger),
              application:set_env(luger, app_name, "luger_test"),
              application:set_env(luger, type, stderr),
-             application:set_env(luger, statsd, true),
+             application:set_env(luger, optics, true),
              application:set_env(luger, throttle_threshold, 3),
              application:start(luger),
              Logger = setup(),
@@ -385,12 +379,12 @@ throttling_test_() ->
          begin
              [luger:alert("throttling.main", "msg") || _ <- lists:seq(0, 100)],
              ?assert_log_count(Logger, stderr, 3),
-             ?assert_log_count(Logger, statsd, 3),
+             ?assert_log_count(Logger, optics, 3),
              ?assert_log_empty(Logger),
 
              luger:alert("throttling.other", "msg"),
              ?assert_log_count(Logger, stderr, 1),
-             ?assert_log_count(Logger, statsd, 1),
+             ?assert_log_count(Logger, optics, 1),
              ?assert_log_empty(Logger),
 
              sleep(1000),
@@ -398,13 +392,13 @@ throttling_test_() ->
              % ensure luger emitted "dropped N messages", which will also call
              % luger:record_metrics/3 one extra time
              ?assert_log_count(Logger, stderr, 1 + 1),
-             ?assert_log_count(Logger, statsd, 1 + 1),
+             ?assert_log_count(Logger, optics, 1 + 1),
              ?assert_log_empty(Logger),
 
              sleep(1000),
              [luger:alert("throttling.main", "msg") || _ <- lists:seq(0, 100)],
              ?assert_log_count(Logger, stderr, 3),
-             ?assert_log_count(Logger, statsd, 3),
+             ?assert_log_count(Logger, optics, 3),
              ?assert_log_empty(Logger)
          end)
      ]}.
@@ -416,7 +410,7 @@ single_line_test_() ->
              application:set_env(luger, app_name, "luger_test"),
              application:set_env(luger, single_line, true),
              application:set_env(luger, type, stderr),
-             application:set_env(luger, statsd, false),
+             application:set_env(luger, optics, false),
              application:start(luger),
              setup()
      end,
@@ -482,17 +476,18 @@ setup() ->
                         luger_test_server:log(stderr, Line)
                 end),
 
-    meck:new(statsderl),
-    meck:expect(statsderl, increment,
-                fun (Key, Inc, _) -> luger_test_server:log(statsd, {Key, Inc}) end),
-
     meck:new(calendar, [unstick]),
     meck:expect(calendar, local_time, fun () -> ?NOW end),
+
+    meck:new(erl_optics, [non_strict]),
+    meck:expect(erl_optics, counter_inc_alloc,
+               fun (Key, Inc) -> luger_test_server:log(optics, {Key, Inc}) end),
+
 
     Logger.
 
 terminate(Logger) ->
     meck:unload(calendar),
-    meck:unload(statsderl),
     meck:unload(luger_utils),
+    meck:unload(erl_optics),
     Logger ! close.

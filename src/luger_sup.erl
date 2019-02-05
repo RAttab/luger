@@ -21,14 +21,14 @@ start_link() ->
 args() ->
     {ok, AppName} = application:get_env(app_name),
     HostName = luger_utils:hostname(),
-    Statsd = case application:get_env(statsd) of
+    Optics = case application:get_env(optics) of
                  {ok, Value} when is_boolean(Value) -> Value;
                  undefined -> false
              end,
     MaxLen = application:get_env(luger, max_msg_len, 2048),
     #config{app = luger_utils:appname(AppName),
             host = HostName,
-            statsd = Statsd,
+            optics = Optics,
             max_msg_len = MaxLen }.
 
 stderr_args() ->
