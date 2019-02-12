@@ -198,7 +198,8 @@ throttle_channel(Channel, Now, _, _) ->
 
 record_metrics(#state{optics = true}, Priority, Channel) ->
     Key = [<<"luger.">>, luger_utils:priority_to_list(Priority), $., Channel],
-    erl_optics:counter_inc_alloc(Key, 1);
+    statsderl:increment(Key, 1, 1.0),
+    erl_optics:counter_inc_alloc(list_to_binary(Key), 1);
 
 record_metrics(#state{optics = false}, _Priority, _Channel) ->
     ok.
