@@ -111,7 +111,7 @@ debug(Channel, Format, Args) ->
           syslog_udp_host   = undefined   :: undefined | string(),
           syslog_udp_port   = undefined   :: undefined | integer(),
           syslog_udp_facility = undefined :: undefined | integer(),
-          msglength                       :: integer()
+          msglength                       :: undefined | integer()
          }).
 
 init([#config{app = AppName, host = HostName, statsd = Statsd, msglength = Len}, SinkConfig, SingleLine, ThrottleThreshold]) ->
