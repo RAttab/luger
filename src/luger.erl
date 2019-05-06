@@ -111,14 +111,14 @@ debug(Channel, Format, Args) ->
           syslog_udp_host   = undefined   :: undefined | string(),
           syslog_udp_port   = undefined   :: undefined | integer(),
           syslog_udp_facility = undefined :: undefined | integer(),
-          msglength                       :: undefined | integer()
+          max_msg_len                     :: undefined | integer()
          }).
 
-init([#config{app = AppName, host = HostName, statsd = Statsd, msglength = MaxLen}, SinkConfig, SingleLine, ThrottleThreshold]) ->
+init([#config{app = AppName, host = HostName, statsd = Statsd, max_msg_len = MaxLen}, SinkConfig, SingleLine, ThrottleThreshold]) ->
     register(?PROC_NAME, self()),
     ok = error_logger:add_report_handler(luger_error_logger),
 
-    State = init_sink(#state{app = AppName, host = HostName, statsd = Statsd, msglength = MaxLen}, SinkConfig),
+    State = init_sink(#state{app = AppName, host = HostName, statsd = Statsd, max_msg_len = MaxLen}, SinkConfig),
 
     ets:new(?TABLE, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
     true = ets:insert_new(?TABLE, {state, State#state{
@@ -212,7 +212,7 @@ do_log(State, Priority, Channel, Message) ->
             io_lib:format("~p ", [self()]),
             luger_utils:channel(Channel), $\s,
             $\s, % structured message
-            luger_utils:message(Message, State#state.single_line, State#state.msglength)],
+            luger_utils:message(Message, State#state.single_line, State#state.max_msg_len)],
     log_to(Priority, State#state.type, Data, State).
 
 stderr_priority(?EMERGENCY) -> <<"<emergency>">>;

@@ -10,7 +10,7 @@
 -record(config, { app       :: string(),
                   host      :: string(),
                   statsd    :: boolean(),
-                  msglength :: integer() }).
+                  max_msg_len :: integer() }).
 
 -record(syslog_udp_config, { host     :: string(),
                              port     :: integer(),
