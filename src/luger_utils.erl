@@ -34,10 +34,10 @@ single_line(Msg, false) ->
 single_line(Msg, true) ->
     lists:join(" ", binary:split(iolist_to_binary(Msg), [<<"\n">>, <<" ">>], [global, trim_all])).
 
-message(Msg, SingleLine, Len) ->
-    case Len of
+message(Msg, SingleLine, MaxLen) ->
+    case MaxLen of
       undefined -> single_line(Msg, SingleLine);
-      _ -> trunc(Len, single_line(Msg, SingleLine))
+      _ -> trunc(MaxLen, single_line(Msg, SingleLine))
     end.
 
 priority_to_list(?EMERGENCY) -> "emergency";

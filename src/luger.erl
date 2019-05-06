@@ -114,11 +114,11 @@ debug(Channel, Format, Args) ->
           msglength                       :: undefined | integer()
          }).
 
-init([#config{app = AppName, host = HostName, statsd = Statsd, msglength = Len}, SinkConfig, SingleLine, ThrottleThreshold]) ->
+init([#config{app = AppName, host = HostName, statsd = Statsd, msglength = MaxLen}, SinkConfig, SingleLine, ThrottleThreshold]) ->
     register(?PROC_NAME, self()),
     ok = error_logger:add_report_handler(luger_error_logger),
 
-    State = init_sink(#state{app = AppName, host = HostName, statsd = Statsd, msglength = Len}, SinkConfig),
+    State = init_sink(#state{app = AppName, host = HostName, statsd = Statsd, msglength = MaxLen}, SinkConfig),
 
     ets:new(?TABLE, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
     true = ets:insert_new(?TABLE, {state, State#state{
