@@ -25,9 +25,11 @@ args() ->
                  {ok, Value} when is_boolean(Value) -> Value;
                  undefined -> false
              end,
+    MaxLen = application:get_env(luger, max_msg_len, 2048),
     #config{app = luger_utils:appname(AppName),
             host = HostName,
-            statsd = Statsd }.
+            statsd = Statsd,
+            max_msg_len = MaxLen }.
 
 stderr_args() ->
     MinPriority = case application:get_env(stderr_min_priority) of

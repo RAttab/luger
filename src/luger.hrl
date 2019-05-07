@@ -7,9 +7,10 @@
 -define(INFO, 6).
 -define(DEBUG, 7).
 
--record(config, { app    :: string(),
-                  host   :: string(),
-                  statsd :: boolean() }).
+-record(config, { app         :: string(),
+                  host        :: string(),
+                  statsd      :: boolean(),
+                  max_msg_len :: undefined | integer() }).
 
 -record(syslog_udp_config, { host     :: string(),
                              port     :: integer(),
