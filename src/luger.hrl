@@ -9,7 +9,7 @@
 
 -record(config, { app         :: string(),
                   host        :: string(),
-                  statsd      :: boolean(),
+                  optics      :: boolean(),
                   max_msg_len :: undefined | integer() }).
 
 -record(syslog_udp_config, { host     :: string(),

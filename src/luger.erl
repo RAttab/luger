@@ -102,7 +102,7 @@ debug(Channel, Format, Args) ->
 -record(state, {
           app                             :: string(),
           host                            :: string(),
-          statsd                          :: boolean(),
+          optics                          :: boolean(),
           single_line                     :: boolean(),
           throttle_threshold = 5          :: pos_integer(),
           type                            :: null | stderr | syslog_udp,
@@ -114,11 +114,11 @@ debug(Channel, Format, Args) ->
           max_msg_len                     :: undefined | integer()
          }).
 
-init([#config{app = AppName, host = HostName, statsd = Statsd, max_msg_len = MaxLen}, SinkConfig, SingleLine, ThrottleThreshold]) ->
+init([#config{app = AppName, host = HostName, optics = Optics, max_msg_len = MaxLen}, SinkConfig, SingleLine, ThrottleThreshold]) ->
     register(?PROC_NAME, self()),
     ok = error_logger:add_report_handler(luger_error_logger),
 
-    State = init_sink(#state{app = AppName, host = HostName, statsd = Statsd, max_msg_len = MaxLen}, SinkConfig),
+    State = init_sink(#state{app = AppName, host = HostName, optics = Optics, max_msg_len = MaxLen}, SinkConfig),
 
     ets:new(?TABLE, [named_table, public, set, {keypos, 1}, {read_concurrency, true}]),
     true = ets:insert_new(?TABLE, {state, State#state{
@@ -196,10 +196,12 @@ throttle_channel(Channel, Now, _, _) ->
     ets:insert(?TABLE, {Channel, 1, Now}).
 
 
-record_metrics(#state{statsd = true}, Priority, Channel) ->
+record_metrics(#state{optics = true}, Priority, Channel) ->
     Key = [<<"luger.">>, luger_utils:priority_to_list(Priority), $., Channel],
-    statsderl:increment(Key, 1, 1.0);
-record_metrics(#state{statsd = false}, _Priority, _Channel) ->
+    statsderl:increment(Key, 1, 1.0),
+    erl_optics:counter_inc(list_to_binary(Key), 1);
+
+record_metrics(#state{optics = false}, _Priority, _Channel) ->
     ok.
 
 
