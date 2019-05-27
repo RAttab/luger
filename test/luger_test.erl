@@ -480,7 +480,7 @@ setup() ->
     meck:expect(calendar, local_time, fun () -> ?NOW end),
 
     meck:new(erl_optics, [non_strict]),
-    meck:expect(erl_optics, counter_inc_alloc,
+    meck:expect(erl_optics, counter_inc,
                fun (Key, Inc) -> luger_test_server:log(optics, {Key, Inc}) end),
 
 
