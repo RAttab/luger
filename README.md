@@ -30,23 +30,25 @@ project.
 
 Config for the application env can be one of the following:
 ```erlang
-  {luger, [
-      {app_name, "my-app"}
-      {type, stderr}
-  ]}
-```
-```erlang
-  {luger, [
-      {app_name, "my-app"}
-      {type, syslog_udp},
-	  {syslog_udp_host, {127, 0, 0, 1}},
-	  {syslog_udp_port, 514},
-          {syslog_udp_facility, 10}
-  ]}
+{luger, [
+  {app_name, "my-app"}
+  {type, stderr}
+]}
 ```
 
-It's also possible to record the number of messages received per priority into
-optics through erl-optics by adding `{optics, true}` to the config.
+```erlang
+{luger, [
+  {app_name, "my-app"}
+  {type, syslog_udp},
+  {syslog_udp_host, {127, 0, 0, 1}},
+  {syslog_udp_port, 514},
+  {syslog_udp_facility, 10}
+]}
+```
+
+Addtional options:
+* `max_msg_len`: truncate long log message to this length. Setting this option
+  to `undefined` removes the cap. Default value is `2048`.
 
 Once the application is set up, logging can be done like so:
 ```erlang
