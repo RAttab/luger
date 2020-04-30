@@ -40,7 +40,8 @@ Config for the application env can be one of the following:
       {app_name, "my-app"}
       {type, syslog_udp},
 	  {syslog_udp_host, {127, 0, 0, 1}},
-	  {syslog_udp_port, 514}
+	  {syslog_udp_port, 514},
+          {syslog_udp_facility, 10}
   ]}
 ```
 
