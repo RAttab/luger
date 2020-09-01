@@ -21,7 +21,11 @@ start_link() ->
 args() ->
     {ok, AppName} = application:get_env(luger, app_name),
     HostName = luger_utils:hostname(),
-    MaxLen = application:get_env(luger, max_msg_len, 2048),
+    MaxLen = case application:get_env(luger, max_msg_len) of
+        undefined -> 2048;
+        {ok, N} when is_integer(N) -> N;
+        {ok, infinity} -> infinity
+    end,
     #config{app = luger_utils:appname(AppName),
             host = HostName,
             max_msg_len = MaxLen }.

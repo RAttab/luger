@@ -34,7 +34,7 @@ single_line(Msg, false) ->
 single_line(Msg, true) ->
     lists:join(" ", binary:split(iolist_to_binary(Msg), [<<"\n">>, <<" ">>], [global, trim_all])).
 
-message(Msg, SingleLine, undefined) ->
+message(Msg, SingleLine, infinity) ->
     single_line(Msg, SingleLine);
 message(Msg, SingleLine, MaxLen) ->
     trunc(MaxLen, single_line(Msg, SingleLine)).
